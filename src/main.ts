@@ -1,16 +1,46 @@
 const Eris = require("eris");
 const fs = require("fs");
-const { bufferToBuffer } = require("bufferutil");
+const wavConverter = require("wav-converter");
+const path = require("path");
+
+require('dotenv').config();
 
 
-const bot = new Eris("DISCORD_BOT_TOKEN");
+const bot = new Eris(process.env.DISCORD_BOT_TOKEN);
 
-const CHUNK_TIME = 100000;
+const SENTENCE_INTERVAL = 500;
 
 const userVoiceDataMap = new Map();
 
 bot.on("ready", () => {
     console.log("Ready!");
+
+    setInterval(() => {
+        userVoiceDataMap.forEach((userData, userID) => {
+          const currentTime = Date.now();
+
+          if (currentTime - userData.lastTime >= SENTENCE_INTERVAL) {
+            const filename = userData.filename;
+            const pcmData = fs.readFileSync(path.resolve(__dirname, `../outputs/${filename}.pcm`))
+            const wavData = wavConverter.encodeWav(pcmData, {
+                numChannels: 2,
+                sampleRate: 48000,
+                byteRate: 16
+            });
+ 
+            fs.writeFileSync(path.resolve(__dirname, `../outputs/${filename}.wav`), wavData);
+    
+            userVoiceDataMap.delete(userID);
+            fs.unlink(`./outputs/${filename}.pcm`, (err) => {
+                if (err) {
+                    console.error(`${filename}.pcm 파일 삭제 중 오류 발생`);
+                } else {
+                    console.log(`${filename}.pcm 파일 삭제 완료`);
+                }
+            });
+          }
+        });
+      }, SENTENCE_INTERVAL);
 });
 
 bot.on("messageCreate", (msg) => {
@@ -28,32 +58,18 @@ bot.on("messageCreate", (msg) => {
                 bot.createMessage(msg.channel.id, "hello");
                 const voiceReceiver = voiceConnection.receive("pcm")
                 voiceReceiver.on("data", (voiceData, userID, timestamp, sequence) => {
-                    // console.log(userVoiceDataMap);
-                    // map key: 유저 ID
-                    if (!userVoiceDataMap.has(userID)) {
-                        userVoiceDataMap.set(userID, {
-                            data: [],
-                            startTime: timestamp,
-                        });
-                    }
-
-                    // voiceData 배열에 추가
-                    const userVoiceData = userVoiceDataMap.get(userID);
-                    userVoiceData.data.push(voiceData);
-
-                    // 처음 기록한 timestamp와 지금 timestamp의 차가 지정한 크기보다 클 때 파일 저장
-                    // 파일 저장 방식은 이후에 변경 가능 (ex. 파일을 분리하지 않고 하나로 합치기)
-                    if (timestamp - userVoiceData.startTime > CHUNK_TIME) {
-                        const fileName = `${userID}-${timestamp}.pcm`;
-                        const buffer = Buffer.concat(userVoiceData.data);
-
-                        fs.writeFileSync(fileName, buffer);
-
-                        // map key=userID 초기화
-                        userVoiceDataMap.set(userID, {
-                            data: [],
-                            startTime: timestamp,
-                        });
+                    if (userID) {
+                        const currentTime = Date.now();
+                        if (!userVoiceDataMap.has(userID)) {
+                            userVoiceDataMap.set(userID, {
+                                streams: fs.createWriteStream(`./outputs/${userID}-${currentTime}.pcm`),
+                                lastTime: currentTime,
+                                filename: `${userID}-${currentTime}`
+                            });
+                        }
+                        const userVoiceData = userVoiceDataMap.get(userID);
+                        userVoiceData.streams.write(voiceData);
+                        userVoiceData.lastTime = currentTime;
                     }
                 })
             })
@@ -65,8 +81,6 @@ bot.on("messageCreate", (msg) => {
         } else {
             bot.leaveVoiceChannel(msg.member.voiceState.channelID)
             bot.createMessage(msg.channel.id, "bye");
-
-            userVoiceDataMap.clear();
         }
     }
 });

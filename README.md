@@ -15,7 +15,7 @@ npm install -g node-gyp
 
 ## Run
 
-main.ts의 DISCORD_BOT_TOKEN에 값 입력
+.env의 DISCORD_BOT_TOKEN에 값 입력
 
 ```
 npm run start
@@ -31,7 +31,7 @@ npm run start
   - 출력: hello
   - 먼저 음성 채널에 들어간 후에 전송
   - 음성 채널에 들어가 있지 않을 경우 오류 메시지 출력
-  - 음성 채널에 들어가면 자동으로 녹음해서 일정 시간이 지나면 로컬에 파일 저장(userID-timestamp.pcm 형태)
+  - 음성 채널에 들어가면 말할 때만 녹음되고 0.5초 이상 말하지 않으면 .pcm 파일이 .wav로 변환되어 저장
 
 - !leave:
   - 출력: bye
