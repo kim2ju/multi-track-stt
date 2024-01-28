@@ -7,6 +7,7 @@ require('dotenv').config();
 
 
 const bot = new Eris(process.env.DISCORD_BOT_TOKEN);
+const Constants = Eris.Constants;
 
 const SENTENCE_INTERVAL = 500;
 
@@ -46,6 +47,37 @@ bot.on("ready", () => {
 bot.on("messageCreate", (msg) => {
     if(msg.content === "!ping") {
         bot.createMessage(msg.channel.id, "Pong!");
+    } else if (msg.content == "!language"){
+        bot.createMessage(msg.channel.id, {
+            content: "Choose your language!",
+            components: [
+                {
+                    type: Constants.ComponentTypes.ACTION_ROW,
+                    components: [
+                        {   type: Constants.ComponentTypes.BUTTON,
+                            style: Constants.ButtonStyles.PRIMARY,
+                            custom_id: "ko",
+                            label: "한국어",
+                            disabled: false
+                        },
+                        {
+                            type: Constants.ComponentTypes.BUTTON,
+                            style: Constants.ButtonStyles.PRIMARY,
+                            custom_id: "en",
+                            label: "English",
+                            disabled: false
+                        },
+                        {
+                            type: Constants.ComponentTypes.BUTTON,
+                            style: Constants.ButtonStyles.PRIMARY,
+                            custom_id: "tr",
+                            label: "Türkçe",
+                            disabled: false
+                        }
+                    ]
+                }
+            ]
+        }); 
     } else if (msg.content === "!join") {
         if (!msg.member.voiceState.channelID) {
             bot.createMessage(msg.channel.id, "You are not in a voice channel.");
@@ -74,7 +106,7 @@ bot.on("messageCreate", (msg) => {
                 })
             })
         } 
-    }  else if (msg.content === "!leave") {
+    } else if (msg.content === "!leave") {
         if (!msg.member.voiceState.channelID) {
             bot.createMessage(msg.channel.id, "You are not in a voice channel.");
             return;
@@ -85,4 +117,32 @@ bot.on("messageCreate", (msg) => {
     }
 });
 
+bot.on("interactionCreate", (interaction) => {
+    if(interaction instanceof Eris.ComponentInteraction) { 
+        if(interaction.data.custom_id === "ko") {
+            return interaction.createMessage({
+                    content: `<@${interaction.member.user.id}> 한국어로 설정되었습니다.`, 
+                    allowedMentions: {
+                        users: [interaction.member.user.id]
+                    }
+            })
+        } else if (interaction.data.custom_id === "en") {
+            return interaction.createMessage({
+                content: `<@${interaction.member.user.id}> English is set.`,
+                allowedMentions: {
+                    users: [interaction.member.user.id]
+                }
+            })
+        } else if (interaction.data.custom_id === "tr") {
+            return interaction.createMessage({
+                content:   `<@${interaction.member.user.id}> Türkçe olarak ayarlandı.`,
+                allowedMentions: {
+                    users: [interaction.member.user.id]
+                }
+            })
+        }
+    }
+});
+
 bot.connect();
+
