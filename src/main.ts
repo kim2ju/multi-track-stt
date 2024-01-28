@@ -6,12 +6,17 @@ const path = require("path");
 require('dotenv').config();
 
 
-const bot = new Eris(process.env.DISCORD_BOT_TOKEN);
+const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
+    getAllUsers: true,
+    intents: 98303	
+});
+
 const Constants = Eris.Constants;
 
 const SENTENCE_INTERVAL = 500;
 
 const userVoiceDataMap = new Map();
+const memberMap = new Map();
 
 bot.on("ready", () => {
     console.log("Ready!");
@@ -42,6 +47,15 @@ bot.on("ready", () => {
           }
         });
       }, SENTENCE_INTERVAL);
+
+    //get all users in the guild initially
+    bot.users.forEach((user) => {
+        if (!memberMap.has(user.id) && !user.bot)
+            memberMap.set(user.id, {
+                id: user.id,
+                name: user.username,
+            });
+    });
 });
 
 bot.on("messageCreate", (msg) => {
