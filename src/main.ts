@@ -2,27 +2,9 @@ const Eris = require("eris");
 const fs = require("fs");
 const wavConverter = require("wav-converter");
 const path = require("path");
-const axios = require('axios');
 
 require('dotenv').config();
 
-const uploadFile = async (filename) => {
-    try {
-        const filepath = `./outputs/${filename}`;
-        const formData = new FormData();
-        formData.append("file", fs.createReadStream(filepath));
-
-        const response = await axios.post('http://server.com/upload', formData, { // will change this part to our server
-            headers: {
-                'Content-Type': 'multipart/form-data'
-            }
-        });
-
-        console.log(`${filename} uploaded successfully: `, response.data);
-    } catch (error) {
-        console.error('Error during file upload:', error);
-    }
-};
 
 const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
     getAllUsers: true,
@@ -30,43 +12,41 @@ const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
 });
 
 const Constants = Eris.Constants;
+
 const SENTENCE_INTERVAL = 500;
+
 const userVoiceDataMap = new Map();
 const memberMap = new Map();
-
 
 bot.on("ready", () => {
     console.log("Ready!");
 
     setInterval(() => {
-        userVoiceDataMap.forEach(async (userData, userID) => {
-            const currentTime = Date.now();
+        userVoiceDataMap.forEach((userData, userID) => {
+          const currentTime = Date.now();
 
-            if (currentTime - userData.lastTime >= SENTENCE_INTERVAL) {
-                const filename = userData.filename;
-                const pcmData = fs.readFileSync(path.resolve(__dirname, `../outputs/${filename}.pcm`));
-                const wavData = wavConverter.encodeWav(pcmData, {
-                    numChannels: 2,
-                    sampleRate: 48000,
-                    byteRate: 16
-                });
-
-                fs.writeFileSync(path.resolve(__dirname, `../outputs/${filename}.wav`), wavData);
-
-                // Call the new upload function
-                await uploadFile(`${filename}.wav`);
-
-                userVoiceDataMap.delete(userID);
-                fs.unlink(`./outputs/${filename}.pcm`, (err) => {
-                    if (err) {
-                        console.error(`${filename}.pcm 파일 삭제 중 오류 발생`);
-                    } else {
-                        console.log(`${filename}.pcm 파일 삭제 완료`);
-                    }
-                });
-            }
+          if (currentTime - userData.lastTime >= SENTENCE_INTERVAL) {
+            const filename = userData.filename;
+            const pcmData = fs.readFileSync(path.resolve(__dirname, `../outputs/${filename}.pcm`))
+            const wavData = wavConverter.encodeWav(pcmData, {
+                numChannels: 2,
+                sampleRate: 48000,
+                byteRate: 16
+            });
+ 
+            fs.writeFileSync(path.resolve(__dirname, `../outputs/${filename}.wav`), wavData);
+    
+            userVoiceDataMap.delete(userID);
+            fs.unlink(`./outputs/${filename}.pcm`, (err) => {
+                if (err) {
+                    console.error(`${filename}.pcm 파일 삭제 중 오류 발생`);
+                } else {
+                    console.log(`${filename}.pcm 파일 삭제 완료`);
+                }
+            });
+          }
         });
-    }, SENTENCE_INTERVAL);
+      }, SENTENCE_INTERVAL);
 
     //get all users in the guild initially
     bot.users.forEach((user) => {
