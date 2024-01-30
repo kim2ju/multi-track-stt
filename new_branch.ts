@@ -2,27 +2,27 @@ const Eris = require("eris");
 const fs = require("fs");
 const wavConverter = require("wav-converter");
 const path = require("path");
+const FormDataNode = require('form-data'); // npm install form-data
 const axios = require('axios');
+
 
 require('dotenv').config();
 
 const uploadFile = async (filename) => {
     try {
-        const filepath = `./outputs/${filename}`;
-        const formData = new FormData();
+        const filepath = path.resolve(__dirname, `./outputs/${filename}`);
+        const formData = new FormDataNode();
         formData.append("file", fs.createReadStream(filepath));
 
-        const response = await axios.post('http://server.com/upload', formData, { // will change this part to our server
-            headers: {
-                'Content-Type': 'multipart/form-data'
-            }
-        }); 
+        // Omitting explicit headers as axios handles them automatically
+        const response = await axios.post('https://zj0j588ra1.execute-api.ap-northeast-2.amazonaws.com/Deployment2/upload', formData);
 
         console.log(`${filename} uploaded successfully: `, response.data);
     } catch (error) {
-        console.error('Error during file upload:', error);
+        console.error('Error during file upload:', error.response ? error.response.data : error);
     }
 };
+
 
 const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
     getAllUsers: true,
