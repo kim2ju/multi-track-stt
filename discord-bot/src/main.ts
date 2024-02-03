@@ -47,15 +47,6 @@ bot.on("ready", () => {
           }
         });
       }, SENTENCE_INTERVAL);
-
-    //get all users in the guild initially
-    bot.users.forEach((user) => {
-        if (!memberMap.has(user.id) && !user.bot)
-            memberMap.set(user.id, {
-                id: user.id,
-                name: user.username,
-            });
-    });
 });
 
 bot.on("messageCreate", (msg) => {
@@ -128,31 +119,58 @@ bot.on("messageCreate", (msg) => {
             bot.leaveVoiceChannel(msg.member.voiceState.channelID)
             bot.createMessage(msg.channel.id, "bye");
         }
+    } else if (msg.content == "!getLanguageSettings") {
+        let languageSettings = "";
+        memberMap.forEach((user) => {
+            languageSettings += `${user.name} : ${user.language}\n`;
+        });
+        
+        if (languageSettings === "") {
+            bot.createMessage(msg.channel.id, "No user has set the language yet.");
+        } else {
+            bot.createMessage(msg.channel.id, languageSettings);
+        }
+        
     }
+});
+
+bot.on("voiceChannelJoin", (member, newChannel) => {
+     if (!memberMap.has(member.id) && !member.bot)
+        memberMap.set(member.id, {
+            id: member.id,
+            name: member.username,
+            language: "en" //default language is English
+        });
 });
 
 bot.on("interactionCreate", (interaction) => {
     if(interaction instanceof Eris.ComponentInteraction) { 
-        if(interaction.data.custom_id === "ko") {
+        const userId = interaction.member.user.id;
+        const userLanguage = interaction.data.custom_id;
+
+        if (memberMap.has(userId)) {
+            const user = memberMap.get(userId);
+            user.language = userLanguage; 
+            memberMap.set(userId, user);
+        } else {
+            memberMap.set(userId, {
+                id: userId,
+                name: interaction.member.user.username,
+                language: userLanguage
+            });
+        }
+
+        if(userLanguage === "ko") {
             return interaction.createMessage({
-                    content: `<@${interaction.member.user.id}> 한국어로 설정되었습니다.`, 
-                    allowedMentions: {
-                        users: [interaction.member.user.id]
-                    }
+                    content: `<@${userId}> 한국어로 설정되었습니다.` 
             })
-        } else if (interaction.data.custom_id === "en") {
+        } else if (userLanguage === "en") {
             return interaction.createMessage({
-                content: `<@${interaction.member.user.id}> English is set.`,
-                allowedMentions: {
-                    users: [interaction.member.user.id]
-                }
+                content: `<@${userId}> English is set.`    
             })
-        } else if (interaction.data.custom_id === "tr") {
+        } else if (userLanguage === "tr") {
             return interaction.createMessage({
-                content:   `<@${interaction.member.user.id}> Türkçe olarak ayarlandı.`,
-                allowedMentions: {
-                    users: [interaction.member.user.id]
-                }
+                content: `<@${userId}> Türkçe olarak ayarlandı.`
             })
         }
     }
