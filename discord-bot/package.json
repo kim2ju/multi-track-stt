@@ -15,6 +15,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "@aws-sdk/client-transcribe-streaming": "^3.504.0",
     "dotenv": "^16.3.2",
     "eris": "^0.17.2",
     "wav-converter": "^1.0.0"
