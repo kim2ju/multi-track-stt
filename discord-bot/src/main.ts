@@ -2,6 +2,7 @@ const Eris = require("eris");
 const fs = require("fs");
 const wavConverter = require("wav-converter");
 const path = require("path");
+const doSTT = require('./stt').default;
 
 require('dotenv').config();
 
@@ -13,11 +14,35 @@ const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
 
 const Constants = Eris.Constants;
 
-const SENTENCE_INTERVAL = 500;
+const SENTENCE_INTERVAL = 5000;
 
 const userVoiceDataMap = new Map();
 const memberMap = new Map();
 
+function stereoToMono(stereoBuffer) {
+    const numChannels = 2;
+    const bytesPerSample = 2;
+
+    const totalSamples = stereoBuffer.length / (numChannels * bytesPerSample);
+
+    const monoBuffer = Buffer.alloc(totalSamples * bytesPerSample);
+
+    for (let i = 0; i < totalSamples; i++) {
+        const leftIndex = i * numChannels * bytesPerSample;
+        const rightIndex = leftIndex + bytesPerSample;
+
+        const leftValue = stereoBuffer.readInt16LE(leftIndex);
+        const rightValue = stereoBuffer.readInt16LE(rightIndex);
+
+        const averageValue = Math.round((leftValue + rightValue) / 2);
+
+        monoBuffer.writeInt16LE(averageValue, i * bytesPerSample);
+    }
+
+    return monoBuffer;
+}
+
+  
 bot.on("ready", () => {
     console.log("Ready!");
 
@@ -27,21 +52,38 @@ bot.on("ready", () => {
 
           if (currentTime - userData.lastTime >= SENTENCE_INTERVAL) {
             const filename = userData.filename;
-            const pcmData = fs.readFileSync(path.resolve(__dirname, `../outputs/${filename}.pcm`))
+
+            const inputFilePath = `./outputs/${filename}.pcm`;
+            const outputFilePath = `./outputs/${filename}-mono.pcm`;
+
+            const stereoBuffer = fs.readFileSync(inputFilePath);
+
+            const monoBuffer = stereoToMono(stereoBuffer);
+
+            fs.writeFileSync(outputFilePath, monoBuffer);
+            const pcmData = fs.readFileSync(`./outputs/${filename}-mono.pcm`)
             const wavData = wavConverter.encodeWav(pcmData, {
-                numChannels: 2,
+                numChannels: 1,
                 sampleRate: 48000,
                 byteRate: 16
             });
  
-            fs.writeFileSync(path.resolve(__dirname, `../outputs/${filename}.wav`), wavData);
-    
+            fs.writeFileSync(`./outputs/${filename}.wav`, wavData);
+            doSTT(`./outputs/${filename}.wav`);
+
             userVoiceDataMap.delete(userID);
             fs.unlink(`./outputs/${filename}.pcm`, (err) => {
                 if (err) {
                     console.error(`${filename}.pcm 파일 삭제 중 오류 발생`);
                 } else {
                     console.log(`${filename}.pcm 파일 삭제 완료`);
+                }
+            });
+            fs.unlink(`./outputs/${filename}-mono.pcm`, (err) => {
+                if (err) {
+                    console.error(`${filename}-mono.pcm 파일 삭제 중 오류 발생`);
+                } else {
+                    console.log(`${filename}-mono.pcm 파일 삭제 완료`);
                 }
             });
           }
@@ -177,4 +219,3 @@ bot.on("interactionCreate", (interaction) => {
 });
 
 bot.connect();
-
