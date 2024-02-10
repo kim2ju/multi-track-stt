@@ -70,7 +70,7 @@ bot.on("ready", () => {
  
             fs.writeFileSync(`./outputs/${filename}.wav`, wavData);
             doSTT(`./outputs/${filename}.wav`);
-
+            
             userVoiceDataMap.delete(userID);
             fs.unlink(`./outputs/${filename}.pcm`, (err) => {
                 if (err) {
@@ -103,21 +103,21 @@ bot.on("messageCreate", (msg) => {
                     components: [
                         {   type: Constants.ComponentTypes.BUTTON,
                             style: Constants.ButtonStyles.PRIMARY,
-                            custom_id: "ko",
+                            custom_id: "ko-KR",
                             label: "한국어",
                             disabled: false
                         },
                         {
                             type: Constants.ComponentTypes.BUTTON,
                             style: Constants.ButtonStyles.PRIMARY,
-                            custom_id: "en",
+                            custom_id: "en-US",
                             label: "English",
                             disabled: false
                         },
                         {
                             type: Constants.ComponentTypes.BUTTON,
                             style: Constants.ButtonStyles.PRIMARY,
-                            custom_id: "tr",
+                            custom_id: "tr-TR",
                             label: "Türkçe",
                             disabled: false
                         }
@@ -135,6 +135,15 @@ bot.on("messageCreate", (msg) => {
                 console.log(err);
             }).then((voiceConnection) => {
                 bot.createMessage(msg.channel.id, "hello");
+                bot.getChannel(msg.member.voiceState.channelID).voiceMembers.forEach((member) => {
+                    if (!memberMap.has(member.id) && !member.bot)
+                        memberMap.set(member.id, {
+                        id: member.id,
+                        name: member.username,
+                        language: "en-US"
+                    });
+                })
+                console.log(memberMap);
                 const voiceReceiver = voiceConnection.receive("pcm")
                 voiceReceiver.on("data", (voiceData, userID, timestamp, sequence) => {
                     if (userID) {
@@ -181,7 +190,7 @@ bot.on("voiceChannelJoin", (member, newChannel) => {
         memberMap.set(member.id, {
             id: member.id,
             name: member.username,
-            language: "en" //default language is English
+            language: "en-US" //default language is English
         });
 });
 
@@ -202,15 +211,15 @@ bot.on("interactionCreate", (interaction) => {
             });
         }
 
-        if(userLanguage === "ko") {
+        if(userLanguage === "ko-KR") {
             return interaction.createMessage({
                     content: `<@${userId}> 한국어로 설정되었습니다.` 
             })
-        } else if (userLanguage === "en") {
+        } else if (userLanguage === "en-US") {
             return interaction.createMessage({
                 content: `<@${userId}> English is set.`    
             })
-        } else if (userLanguage === "tr") {
+        } else if (userLanguage === "tr-TR") {
             return interaction.createMessage({
                 content: `<@${userId}> Türkçe olarak ayarlandı.`
             })
