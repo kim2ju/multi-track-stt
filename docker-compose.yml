@@ -5,9 +5,3 @@ services:
       context: ./discord-bot
     ports:
       - "3000:3000"
-
-  translate-server-app:
-    build:
-      context: ./translate-server
-    ports:
-      - "8080:8080"
