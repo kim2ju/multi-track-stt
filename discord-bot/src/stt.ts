@@ -22,7 +22,7 @@ async function* audioSource(filename) {
     }
 }
 
-const doSTT = async (filename) => {
+const doSTT = async (filename, language) => {
     console.log(`***start: [${new Date()}]`);
     async function * audioStream() {
         for await(const chunk of audioSource(filename)) {
@@ -38,7 +38,7 @@ const doSTT = async (filename) => {
     });
 
     const command = new StartStreamTranscriptionCommand({
-        LanguageCode: 'ko-KR',
+        LanguageCode: language,
         MediaSampleRateHertz: 48000,
         MediaEncoding: 'pcm',
         AudioStream: audioStream(),

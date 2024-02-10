@@ -69,8 +69,10 @@ bot.on("ready", () => {
             });
  
             fs.writeFileSync(`./outputs/${filename}.wav`, wavData);
-            doSTT(`./outputs/${filename}.wav`);
-            
+
+            const memberData = memberMap.get(userID);
+            doSTT(`./outputs/${filename}.wav`, memberData.language);
+
             userVoiceDataMap.delete(userID);
             fs.unlink(`./outputs/${filename}.pcm`, (err) => {
                 if (err) {
