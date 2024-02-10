@@ -145,7 +145,6 @@ bot.on("messageCreate", (msg) => {
                         language: "en-US"
                     });
                 })
-                console.log(memberMap);
                 const voiceReceiver = voiceConnection.receive("pcm")
                 voiceReceiver.on("data", (voiceData, userID, timestamp, sequence) => {
                     if (userID) {
@@ -194,6 +193,11 @@ bot.on("voiceChannelJoin", (member, newChannel) => {
             name: member.username,
             language: "en-US" //default language is English
         });
+});
+
+bot.on("voiceChannelLeave", (member, newChannel) => {
+    if (memberMap.has(member.id) && !member.bot)
+       memberMap.delete(member.id);
 });
 
 bot.on("interactionCreate", (interaction) => {
