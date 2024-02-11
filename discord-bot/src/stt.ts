@@ -23,7 +23,7 @@ async function* audioSource(filename) {
 }
 
 const doSTT = async (filename, language) => {
-    console.log(`***start: [${new Date()}]`);
+    const startTime = process.hrtime();
     async function * audioStream() {
         for await(const chunk of audioSource(filename)) {
             yield {AudioEvent: {AudioChunk: chunk}}
@@ -50,14 +50,15 @@ const doSTT = async (filename, language) => {
             if(event.TranscriptEvent) {
                 const results = event.TranscriptEvent.Transcript.Results;
                 results.map(result => {
-                    (result.Alternatives || []).map(alternative => {
-                        const str = alternative.Items.map(item => item.Content).join(' ');
-                        console.log(str)
-                    })
+                    if (!result.IsPartial)
+                        (result.Alternatives).map(alternative => {
+                            console.log(alternative.Transcript)
+                        })
                 })
             }
         }
-        console.log('DONE', data);
+        const endTime = process.hrtime(startTime);
+        console.log('Transcribe 실행 시간: %ds %dms', endTime[0], endTime[1] / 1000000);
         client.destroy();
     } catch(e) {
         console.log('ERROR: ', e);

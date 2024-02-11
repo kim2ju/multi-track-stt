@@ -48,49 +48,37 @@ bot.on("ready", () => {
 
     setInterval(() => {
         userVoiceDataMap.forEach((userData, userID) => {
-          const currentTime = Date.now();
+            const currentTime = Date.now();
 
-          if (currentTime - userData.lastTime >= SENTENCE_INTERVAL) {
-            const filename = userData.filename;
+            if (currentTime - userData.lastTime >= SENTENCE_INTERVAL) {
+                const filename = userData.filename;
 
-            const inputFilePath = `./outputs/${filename}.pcm`;
-            const outputFilePath = `./outputs/${filename}-mono.pcm`;
+                const inputFilePath = `./outputs/${filename}.pcm`;
+                const outputFilePath = `./outputs/${filename}-mono.pcm`;
 
-            const stereoBuffer = fs.readFileSync(inputFilePath);
+                const stereoBuffer = fs.readFileSync(inputFilePath);
 
-            const monoBuffer = stereoToMono(stereoBuffer);
+                const monoBuffer = stereoToMono(stereoBuffer);
 
-            fs.writeFileSync(outputFilePath, monoBuffer);
-            const pcmData = fs.readFileSync(`./outputs/${filename}-mono.pcm`)
-            const wavData = wavConverter.encodeWav(pcmData, {
-                numChannels: 1,
-                sampleRate: 48000,
-                byteRate: 16
-            });
- 
-            fs.writeFileSync(`./outputs/${filename}.wav`, wavData);
+                fs.writeFileSync(outputFilePath, monoBuffer);
+                const pcmData = fs.readFileSync(`./outputs/${filename}-mono.pcm`)
+                const wavData = wavConverter.encodeWav(pcmData, {
+                    numChannels: 1,
+                    sampleRate: 48000,
+                    byteRate: 16
+                });
+    
+                fs.writeFileSync(`./outputs/${filename}.wav`, wavData);
 
-            const memberData = memberMap.get(userID);
-            doSTT(`./outputs/${filename}.wav`, memberData.language);
+                const memberData = memberMap.get(userID);
+                doSTT(`./outputs/${filename}.wav`, memberData.language);
 
-            userVoiceDataMap.delete(userID);
-            fs.unlink(`./outputs/${filename}.pcm`, (err) => {
-                if (err) {
-                    console.error(`${filename}.pcm 파일 삭제 중 오류 발생`);
-                } else {
-                    console.log(`${filename}.pcm 파일 삭제 완료`);
-                }
-            });
-            fs.unlink(`./outputs/${filename}-mono.pcm`, (err) => {
-                if (err) {
-                    console.error(`${filename}-mono.pcm 파일 삭제 중 오류 발생`);
-                } else {
-                    console.log(`${filename}-mono.pcm 파일 삭제 완료`);
-                }
-            });
-          }
+                userVoiceDataMap.delete(userID);
+                fs.unlink(`./outputs/${filename}.pcm`, () => {});
+                fs.unlink(`./outputs/${filename}-mono.pcm`, () => {});
+            }
         });
-      }, SENTENCE_INTERVAL);
+    }, SENTENCE_INTERVAL);
 });
 
 bot.on("messageCreate", (msg) => {
