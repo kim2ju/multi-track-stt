@@ -48,47 +48,37 @@ bot.on("ready", () => {
 
     setInterval(() => {
         userVoiceDataMap.forEach((userData, userID) => {
-          const currentTime = Date.now();
+            const currentTime = Date.now();
 
-          if (currentTime - userData.lastTime >= SENTENCE_INTERVAL) {
-            const filename = userData.filename;
+            if (currentTime - userData.lastTime >= SENTENCE_INTERVAL) {
+                const filename = userData.filename;
 
-            const inputFilePath = `./outputs/${filename}.pcm`;
-            const outputFilePath = `./outputs/${filename}-mono.pcm`;
+                const inputFilePath = `./outputs/${filename}.pcm`;
+                const outputFilePath = `./outputs/${filename}-mono.pcm`;
 
-            const stereoBuffer = fs.readFileSync(inputFilePath);
+                const stereoBuffer = fs.readFileSync(inputFilePath);
 
-            const monoBuffer = stereoToMono(stereoBuffer);
+                const monoBuffer = stereoToMono(stereoBuffer);
 
-            fs.writeFileSync(outputFilePath, monoBuffer);
-            const pcmData = fs.readFileSync(`./outputs/${filename}-mono.pcm`)
-            const wavData = wavConverter.encodeWav(pcmData, {
-                numChannels: 1,
-                sampleRate: 48000,
-                byteRate: 16
-            });
- 
-            fs.writeFileSync(`./outputs/${filename}.wav`, wavData);
-            doSTT(`./outputs/${filename}.wav`);
+                fs.writeFileSync(outputFilePath, monoBuffer);
+                const pcmData = fs.readFileSync(`./outputs/${filename}-mono.pcm`)
+                const wavData = wavConverter.encodeWav(pcmData, {
+                    numChannels: 1,
+                    sampleRate: 48000,
+                    byteRate: 16
+                });
+    
+                fs.writeFileSync(`./outputs/${filename}.wav`, wavData);
 
-            userVoiceDataMap.delete(userID);
-            fs.unlink(`./outputs/${filename}.pcm`, (err) => {
-                if (err) {
-                    console.error(`${filename}.pcm 파일 삭제 중 오류 발생`);
-                } else {
-                    console.log(`${filename}.pcm 파일 삭제 완료`);
-                }
-            });
-            fs.unlink(`./outputs/${filename}-mono.pcm`, (err) => {
-                if (err) {
-                    console.error(`${filename}-mono.pcm 파일 삭제 중 오류 발생`);
-                } else {
-                    console.log(`${filename}-mono.pcm 파일 삭제 완료`);
-                }
-            });
-          }
+                const memberData = memberMap.get(userID);
+                doSTT(`./outputs/${filename}.wav`, memberData.language);
+
+                userVoiceDataMap.delete(userID);
+                fs.unlink(`./outputs/${filename}.pcm`, () => {});
+                fs.unlink(`./outputs/${filename}-mono.pcm`, () => {});
+            }
         });
-      }, SENTENCE_INTERVAL);
+    }, SENTENCE_INTERVAL);
 });
 
 bot.on("messageCreate", (msg) => {
@@ -103,21 +93,21 @@ bot.on("messageCreate", (msg) => {
                     components: [
                         {   type: Constants.ComponentTypes.BUTTON,
                             style: Constants.ButtonStyles.PRIMARY,
-                            custom_id: "ko",
+                            custom_id: "ko-KR",
                             label: "한국어",
                             disabled: false
                         },
                         {
                             type: Constants.ComponentTypes.BUTTON,
                             style: Constants.ButtonStyles.PRIMARY,
-                            custom_id: "en",
+                            custom_id: "en-US",
                             label: "English",
                             disabled: false
                         },
                         {
                             type: Constants.ComponentTypes.BUTTON,
                             style: Constants.ButtonStyles.PRIMARY,
-                            custom_id: "tr",
+                            custom_id: "tr-TR",
                             label: "Türkçe",
                             disabled: false
                         }
@@ -135,6 +125,14 @@ bot.on("messageCreate", (msg) => {
                 console.log(err);
             }).then((voiceConnection) => {
                 bot.createMessage(msg.channel.id, "hello");
+                bot.getChannel(msg.member.voiceState.channelID).voiceMembers.forEach((member) => {
+                    if (!memberMap.has(member.id) && !member.bot)
+                        memberMap.set(member.id, {
+                        id: member.id,
+                        name: member.username,
+                        language: "en-US"
+                    });
+                })
                 const voiceReceiver = voiceConnection.receive("pcm")
                 voiceReceiver.on("data", (voiceData, userID, timestamp, sequence) => {
                     if (userID) {
@@ -181,8 +179,13 @@ bot.on("voiceChannelJoin", (member, newChannel) => {
         memberMap.set(member.id, {
             id: member.id,
             name: member.username,
-            language: "en" //default language is English
+            language: "en-US" //default language is English
         });
+});
+
+bot.on("voiceChannelLeave", (member, newChannel) => {
+    if (memberMap.has(member.id) && !member.bot)
+       memberMap.delete(member.id);
 });
 
 bot.on("interactionCreate", (interaction) => {
@@ -202,15 +205,15 @@ bot.on("interactionCreate", (interaction) => {
             });
         }
 
-        if(userLanguage === "ko") {
+        if(userLanguage === "ko-KR") {
             return interaction.createMessage({
                     content: `<@${userId}> 한국어로 설정되었습니다.` 
             })
-        } else if (userLanguage === "en") {
+        } else if (userLanguage === "en-US") {
             return interaction.createMessage({
                 content: `<@${userId}> English is set.`    
             })
-        } else if (userLanguage === "tr") {
+        } else if (userLanguage === "tr-TR") {
             return interaction.createMessage({
                 content: `<@${userId}> Türkçe olarak ayarlandı.`
             })
