@@ -14,7 +14,7 @@ const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
 
 const Constants = Eris.Constants;
 
-const SENTENCE_INTERVAL = 5000;
+const SENTENCE_INTERVAL = 1500; //5000;
 
 const userVoiceDataMap = new Map();
 const memberMap = new Map();
@@ -42,15 +42,16 @@ function stereoToMono(stereoBuffer) {
     return monoBuffer;
 }
 
-  
+//code for 48kHz audio  
 bot.on("ready", () => {
     console.log("Ready!");
 
     setInterval(() => {
         userVoiceDataMap.forEach((userData, userID) => {
             const currentTime = Date.now();
-
-            if (currentTime - userData.lastTime >= SENTENCE_INTERVAL) {
+            const elapsedTimeSinceLastSTT = currentTime - userData.lastSTTTime;
+            const samplerate = 48000
+            if (currentTime - userData.lastTime >= SENTENCE_INTERVAL || elapsedTimeSinceLastSTT >= 20000 ) {
                 const filename = userData.filename;
 
                 const inputFilePath = `./outputs/${filename}.pcm`;
@@ -64,15 +65,15 @@ bot.on("ready", () => {
                 const pcmData = fs.readFileSync(`./outputs/${filename}-mono.pcm`)
                 const wavData = wavConverter.encodeWav(pcmData, {
                     numChannels: 1,
-                    sampleRate: 48000,
+                    sampleRate: samplerate,
                     byteRate: 16
                 });
     
                 fs.writeFileSync(`./outputs/${filename}.wav`, wavData);
 
                 const memberData = memberMap.get(userID);
-                doSTT(`./outputs/${filename}.wav`, memberData.language);
-
+                doSTT(`./outputs/${filename}.wav`, memberData.language, samplerate); //STT on wav file
+                //doSTT(`./outputs/${filename}-mono.pcm`, memberData.language, samplerate); //STT on pcm file
                 userVoiceDataMap.delete(userID);
                 fs.unlink(`./outputs/${filename}.pcm`, () => {});
                 fs.unlink(`./outputs/${filename}-mono.pcm`, () => {});
@@ -80,6 +81,64 @@ bot.on("ready", () => {
         });
     }, SENTENCE_INTERVAL);
 });
+
+// code for 16kHz audio  
+// bot.on("ready", () => {
+//     console.log("Ready!");
+
+//     setInterval(() => {
+//         userVoiceDataMap.forEach((userData, userID) => {
+//           const currentTime = Date.now();
+//           const elapsedTimeSinceLastSTT = currentTime - userData.lastSTTTime;
+//           const samplerate = 16000
+        
+//           if (currentTime - userData.lastTime >= SENTENCE_INTERVAL || elapsedTimeSinceLastSTT >= 20000) { 
+//             const filename = userData.filename;
+
+//             // 48kHz로 샘플링된 PCM 파일의 경로
+//             const inputFilePath = `./outputs/${filename}.pcm`;
+//             const outputFilePath = `./outputs/${filename}-mono.pcm`;
+
+//             // 16kHz로 샘플링된 PCM 파일의 경로
+//             const outputFile16_Path = `./outputs/${filename}-mono-16k.pcm`;
+//             // 48kHz stereo to Mono
+//             const stereoBuffer = fs.readFileSync(inputFilePath);
+//             const monoBuffer = stereoToMono(stereoBuffer);
+//             fs.writeFileSync(outputFilePath, monoBuffer); 
+//             const pcmData = fs.readFileSync(`./outputs/${filename}-mono.pcm`)
+
+
+//             // Execute SoX command to resample mono PCM data
+//             const command = `sox -r 48000 -e signed -b 16 -c 1 -t raw ${outputFilePath} -r 16000 -e signed-integer -b 16 -c 1 -t raw ${outputFile16_Path}`;
+
+//             exec(command, (error, stdout, stderr) => {
+//                 if (error) {
+//                     console.error(`Error: ${error.message}`);
+//                     return;
+//                 }
+//                 if (stderr) {
+//                     console.error(`stderr: ${stderr}`);
+//                     return;
+//                 }
+//                 console.log(`stdout: ${stdout}`);
+//                 console.log('Resampling completed successfully.');
+//                 const pcmData_16 = fs.readFileSync(`./outputs/${filename}-mono-16k.pcm`)
+//                 const wavData_16 = wavConverter.encodeWav(pcmData_16, {
+//                     numChannels: 1,
+//                     sampleRate: samplerate, //48000 16000
+//                     byteRate: 16
+//                 });
+//                 fs.writeFileSync(`./outputs/${filename}-16.wav`, wavData_16);
+//                 doSTT(`./outputs/${filename}-16.wav`, samplerate); //do stt on 16kHZ wav
+//                 // doSTT(`./outputs/${filename}-mono-16k.pcm`, samplerate); //do stt on 16kHZ pcm-mono
+//                 userVoiceDataMap.delete(userID);
+//                 userData.lastSTTTime = currentTime; // Update lastSTTTime to current time
+
+//             });
+//           }
+//         });
+//       }, SENTENCE_INTERVAL);
+// });
 
 bot.on("messageCreate", (msg) => {
     if(msg.content === "!ping") {
