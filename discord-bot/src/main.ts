@@ -14,7 +14,7 @@ const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
 
 const Constants = Eris.Constants;
 
-const SENTENCE_INTERVAL = 5000;
+const SENTENCE_INTERVAL = 1500; //5000;
 
 const userVoiceDataMap = new Map();
 const memberMap = new Map();
@@ -42,15 +42,16 @@ function stereoToMono(stereoBuffer) {
     return monoBuffer;
 }
 
-  
+//code for 48kHz audio  
 bot.on("ready", () => {
     console.log("Ready!");
 
     setInterval(() => {
         userVoiceDataMap.forEach((userData, userID) => {
             const currentTime = Date.now();
-
-            if (currentTime - userData.lastTime >= SENTENCE_INTERVAL) {
+            const elapsedTimeSinceLastSTT = currentTime - userData.startTime;
+            const samplerate = 48000
+            if (currentTime - userData.lastTime >= SENTENCE_INTERVAL || elapsedTimeSinceLastSTT >= 15000 ) {
                 const filename = userData.filename;
 
                 const inputFilePath = `./outputs/${filename}.pcm`;
@@ -64,15 +65,16 @@ bot.on("ready", () => {
                 const pcmData = fs.readFileSync(`./outputs/${filename}-mono.pcm`)
                 const wavData = wavConverter.encodeWav(pcmData, {
                     numChannels: 1,
-                    sampleRate: 48000,
+                    sampleRate: samplerate,
                     byteRate: 16
                 });
     
                 fs.writeFileSync(`./outputs/${filename}.wav`, wavData);
 
                 const memberData = memberMap.get(userID);
-                doSTT(`./outputs/${filename}.wav`, memberData.language);
-
+                console.log(memberData.language)
+                doSTT(`./outputs/${filename}.wav`, memberData.language, samplerate); //STT on wav file
+                //doSTT(`./outputs/${filename}-mono.pcm`, memberData.language, samplerate); //STT on pcm file
                 userVoiceDataMap.delete(userID);
                 fs.unlink(`./outputs/${filename}.pcm`, () => {});
                 fs.unlink(`./outputs/${filename}-mono.pcm`, () => {});
@@ -80,6 +82,7 @@ bot.on("ready", () => {
         });
     }, SENTENCE_INTERVAL);
 });
+
 
 bot.on("messageCreate", (msg) => {
     if(msg.content === "!ping") {
@@ -141,6 +144,7 @@ bot.on("messageCreate", (msg) => {
                             userVoiceDataMap.set(userID, {
                                 streams: fs.createWriteStream(`./outputs/${userID}-${currentTime}.pcm`),
                                 lastTime: currentTime,
+                                startTime: currentTime,
                                 filename: `${userID}-${currentTime}`
                             });
                         }
