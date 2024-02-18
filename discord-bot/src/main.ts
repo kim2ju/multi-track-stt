@@ -49,9 +49,9 @@ bot.on("ready", () => {
     setInterval(() => {
         userVoiceDataMap.forEach((userData, userID) => {
             const currentTime = Date.now();
-            const elapsedTimeSinceLastSTT = currentTime - userData.lastSTTTime;
+            const elapsedTimeSinceLastSTT = currentTime - userData.startTime;
             const samplerate = 48000
-            if (currentTime - userData.lastTime >= SENTENCE_INTERVAL || elapsedTimeSinceLastSTT >= 20000 ) {
+            if (currentTime - userData.lastTime >= SENTENCE_INTERVAL || elapsedTimeSinceLastSTT >= 15000 ) {
                 const filename = userData.filename;
 
                 const inputFilePath = `./outputs/${filename}.pcm`;
@@ -72,6 +72,7 @@ bot.on("ready", () => {
                 fs.writeFileSync(`./outputs/${filename}.wav`, wavData);
 
                 const memberData = memberMap.get(userID);
+                console.log(memberData.language)
                 doSTT(`./outputs/${filename}.wav`, memberData.language, samplerate); //STT on wav file
                 //doSTT(`./outputs/${filename}-mono.pcm`, memberData.language, samplerate); //STT on pcm file
                 userVoiceDataMap.delete(userID);
@@ -82,63 +83,6 @@ bot.on("ready", () => {
     }, SENTENCE_INTERVAL);
 });
 
-// code for 16kHz audio  
-// bot.on("ready", () => {
-//     console.log("Ready!");
-
-//     setInterval(() => {
-//         userVoiceDataMap.forEach((userData, userID) => {
-//           const currentTime = Date.now();
-//           const elapsedTimeSinceLastSTT = currentTime - userData.lastSTTTime;
-//           const samplerate = 16000
-        
-//           if (currentTime - userData.lastTime >= SENTENCE_INTERVAL || elapsedTimeSinceLastSTT >= 20000) { 
-//             const filename = userData.filename;
-
-//             // 48kHz로 샘플링된 PCM 파일의 경로
-//             const inputFilePath = `./outputs/${filename}.pcm`;
-//             const outputFilePath = `./outputs/${filename}-mono.pcm`;
-
-//             // 16kHz로 샘플링된 PCM 파일의 경로
-//             const outputFile16_Path = `./outputs/${filename}-mono-16k.pcm`;
-//             // 48kHz stereo to Mono
-//             const stereoBuffer = fs.readFileSync(inputFilePath);
-//             const monoBuffer = stereoToMono(stereoBuffer);
-//             fs.writeFileSync(outputFilePath, monoBuffer); 
-//             const pcmData = fs.readFileSync(`./outputs/${filename}-mono.pcm`)
-
-
-//             // Execute SoX command to resample mono PCM data
-//             const command = `sox -r 48000 -e signed -b 16 -c 1 -t raw ${outputFilePath} -r 16000 -e signed-integer -b 16 -c 1 -t raw ${outputFile16_Path}`;
-
-//             exec(command, (error, stdout, stderr) => {
-//                 if (error) {
-//                     console.error(`Error: ${error.message}`);
-//                     return;
-//                 }
-//                 if (stderr) {
-//                     console.error(`stderr: ${stderr}`);
-//                     return;
-//                 }
-//                 console.log(`stdout: ${stdout}`);
-//                 console.log('Resampling completed successfully.');
-//                 const pcmData_16 = fs.readFileSync(`./outputs/${filename}-mono-16k.pcm`)
-//                 const wavData_16 = wavConverter.encodeWav(pcmData_16, {
-//                     numChannels: 1,
-//                     sampleRate: samplerate, //48000 16000
-//                     byteRate: 16
-//                 });
-//                 fs.writeFileSync(`./outputs/${filename}-16.wav`, wavData_16);
-//                 doSTT(`./outputs/${filename}-16.wav`, samplerate); //do stt on 16kHZ wav
-//                 // doSTT(`./outputs/${filename}-mono-16k.pcm`, samplerate); //do stt on 16kHZ pcm-mono
-//                 userVoiceDataMap.delete(userID);
-//                 userData.lastSTTTime = currentTime; // Update lastSTTTime to current time
-
-//             });
-//           }
-//         });
-//       }, SENTENCE_INTERVAL);
-// });
 
 bot.on("messageCreate", (msg) => {
     if(msg.content === "!ping") {
@@ -200,6 +144,7 @@ bot.on("messageCreate", (msg) => {
                             userVoiceDataMap.set(userID, {
                                 streams: fs.createWriteStream(`./outputs/${userID}-${currentTime}.pcm`),
                                 lastTime: currentTime,
+                                startTime: currentTime,
                                 filename: `${userID}-${currentTime}`
                             });
                         }
