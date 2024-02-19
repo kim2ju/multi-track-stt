@@ -64,7 +64,7 @@ bot.on("ready", () => {
                 fs.writeFileSync(outputFilePath, monoBuffer);
 
                 const memberData = memberMap.get(userID);
-                doSTT(`./outputs/${filename}-mono.pcm`, memberData.language, samplerate); //STT on mono-pcm file
+                doSTT(`./outputs/${filename}-mono.pcm`, memberData.language, samplerate,channelGame); //STT on mono-pcm file
                 userVoiceDataMap.delete(userID);
                 fs.unlink(`./outputs/${filename}.pcm`, () => {});
                 // fs.unlink(`./outputs/    ${filename}-mono.pcm`, () => {});
