@@ -14,7 +14,7 @@ const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
 
 const Constants = Eris.Constants;
 
-const SENTENCE_INTERVAL = 1500; //5000;
+const SENTENCE_INTERVAL = 1500; 
 
 const userVoiceDataMap = new Map();
 const memberMap = new Map();
@@ -46,7 +46,6 @@ function stereoToMono(stereoBuffer) {
 //code for 48kHz audio  
 bot.on("ready", () => {
     console.log("Ready!");
-
     setInterval(() => {
         userVoiceDataMap.forEach((userData, userID) => {
             const currentTime = Date.now();
@@ -63,22 +62,12 @@ bot.on("ready", () => {
                 const monoBuffer = stereoToMono(stereoBuffer);
 
                 fs.writeFileSync(outputFilePath, monoBuffer);
-                const pcmData = fs.readFileSync(`./outputs/${filename}-mono.pcm`)
-                const wavData = wavConverter.encodeWav(pcmData, {
-                    numChannels: 1,
-                    sampleRate: samplerate,
-                    byteRate: 16
-                });
-    
-                fs.writeFileSync(`./outputs/${filename}.wav`, wavData);
 
                 const memberData = memberMap.get(userID);
-                console.log(memberData.language)
-                doSTT(`./outputs/${filename}.wav`, memberData.language, samplerate, channelGame); //STT on wav file
-                //doSTT(`./outputs/${filename}-mono.pcm`, memberData.language, samplerate); //STT on pcm file
+                doSTT(`./outputs/${filename}-mono.pcm`, memberData.language, samplerate); //STT on mono-pcm file
                 userVoiceDataMap.delete(userID);
                 fs.unlink(`./outputs/${filename}.pcm`, () => {});
-                fs.unlink(`./outputs/${filename}-mono.pcm`, () => {});
+                // fs.unlink(`./outputs/    ${filename}-mono.pcm`, () => {});
             }
         });
     }, SENTENCE_INTERVAL);

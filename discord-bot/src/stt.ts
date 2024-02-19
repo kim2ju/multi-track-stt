@@ -47,6 +47,7 @@ const doSTT = async (filename, language, sample_rate, channelGame) => {
 
     try {
         const data = await client.send(command, {sessionTimeout: 2000});
+        // console.log(filename)
         for await (const event of data.TranscriptResultStream) {
             if(event.TranscriptEvent) {
                 const results = event.TranscriptEvent.Transcript.Results;
@@ -65,6 +66,7 @@ const doSTT = async (filename, language, sample_rate, channelGame) => {
         console.log('ERROR: ', e);
         process.exit(1);
     }
+    fs.unlink(filename, () => {});
 }
 
 export default doSTT;
