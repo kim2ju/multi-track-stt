@@ -18,6 +18,7 @@ const SENTENCE_INTERVAL = 1500; //5000;
 
 const userVoiceDataMap = new Map();
 const memberMap = new Map();
+const channelGame = "LOL";
 
 function stereoToMono(stereoBuffer) {
     const numChannels = 2;
@@ -118,6 +119,44 @@ bot.on("messageCreate", (msg) => {
                 }
             ]
         }); 
+    } else if (msg.content === "!game") {
+        bot.createMessage(msg.channel.id, {
+            content: "Choose your game!",
+            components: [
+                {
+                    type: Constants.ComponentTypes.ACTION_ROW,
+                    components: [
+                        {   type: Constants.ComponentTypes.BUTTON,
+                            style: Constants.ButtonStyles.PRIMARY,
+                            custom_id: "LOL",
+                            label: "League of Legends",
+                            disabled: false
+                        },
+                        {
+                            type: Constants.ComponentTypes.BUTTON,
+                            style: Constants.ButtonStyles.PRIMARY,
+                            custom_id: "overwatch",
+                            label: "Overwatch",
+                            disabled: false
+                        },
+                        {
+                            type: Constants.ComponentTypes.BUTTON,
+                            style: Constants.ButtonStyles.PRIMARY,
+                            custom_id: "AmongUs",
+                            label: "Among Us",
+                            disabled: false
+                        },
+                        {
+                            type: Constants.ComponentTypes.BUTTON,
+                            style: Constants.ButtonStyles.PRIMARY,
+                            custom_id: "pubg",
+                            label: "Battlegrounds",
+                            disabled: false
+                        }
+                    ]
+                }
+            ]
+        });
     } else if (msg.content === "!join") {
         if (!msg.member.voiceState.channelID) {
             bot.createMessage(msg.channel.id, "You are not in a voice channel.");
@@ -174,7 +213,8 @@ bot.on("messageCreate", (msg) => {
         } else {
             bot.createMessage(msg.channel.id, languageSettings);
         }
-        
+    } else if (msg.content == "!getGameSettings") {
+        bot.createMessage(msg.channel.id, `The game is set to ${channelGame}.`);
     }
 });
 
@@ -194,33 +234,52 @@ bot.on("voiceChannelLeave", (member, newChannel) => {
 
 bot.on("interactionCreate", (interaction) => {
     if(interaction instanceof Eris.ComponentInteraction) { 
-        const userId = interaction.member.user.id;
-        const userLanguage = interaction.data.custom_id;
-
-        if (memberMap.has(userId)) {
-            const user = memberMap.get(userId);
-            user.language = userLanguage; 
-            memberMap.set(userId, user);
+        if (["LOL", "overwatch", "AmongUs", "pubg"].includes(interaction.data.custom_id)) {
+            const channelGame = interaction.data.custom_id;
+            if (channelGame === "LOL") {
+                return interaction.createMessage({
+                    content: "League of Legends is set."
+                })
+            } else if (channelGame === "overwatch") {    
+                return interaction.createMessage({
+                    content: "Overwatch is set."
+                })
+            } else if (channelGame === "AmongUs") {
+                return interaction.createMessage({
+                    content: "Among Us is set."
+                })
+            } else if (channelGame === "pubg") {
+                return interaction.createMessage({
+                    content: "Battlegrounds is set."
+                })
+            }
         } else {
-            memberMap.set(userId, {
-                id: userId,
-                name: interaction.member.user.username,
-                language: userLanguage
-            });
-        }
+            const userId = interaction.member.user.id;
+            const userLanguage = interaction.data.custom_id;
 
-        if(userLanguage === "ko-KR") {
-            return interaction.createMessage({
-                    content: `<@${userId}> 한국어로 설정되었습니다.` 
-            })
-        } else if (userLanguage === "en-US") {
-            return interaction.createMessage({
-                content: `<@${userId}> English is set.`    
-            })
-        } else if (userLanguage === "tr-TR") {
-            return interaction.createMessage({
-                content: `<@${userId}> Türkçe olarak ayarlandı.`
-            })
+            if (memberMap.has(userId)) {
+                const user = memberMap.get(userId);
+                user.language = userLanguage; 
+                memberMap.set(userId, user);
+            } else {
+                return interaction.createMessage({
+                        content: "Please select a language after the bot enters the voice channel."
+                })
+            }
+
+            if(userLanguage === "ko-KR") {
+                return interaction.createMessage({
+                        content: `<@${userId}> 한국어로 설정되었습니다.` 
+                })
+            } else if (userLanguage === "en-US") {
+                return interaction.createMessage({
+                    content: `<@${userId}> English is set.`    
+                })
+            } else if (userLanguage === "tr-TR") {
+                return interaction.createMessage({
+                    content: `<@${userId}> Türkçe olarak ayarlandı.`
+                })
+            }
         }
     }
 });
