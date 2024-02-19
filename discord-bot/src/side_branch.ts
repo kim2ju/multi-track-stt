@@ -3,9 +3,7 @@ const fs = require("fs");
 const wavConverter = require("wav-converter");
 const path = require("path");
 const doSTT = require('./stt').default;
-const { generateSpeechFromText } = require('./tts');
-const axios = require('axios');
-const { joinVoiceChannel, createAudioResource, StreamType, AudioPlayerStatus, VoiceConnectionStatus, getVoiceConnection } = require('@discordjs/voice');
+const doTTS = require('./tts').default;
 
 require('dotenv').config();
 
@@ -45,51 +43,21 @@ function stereoToMono(stereoBuffer) {
     return monoBuffer;
 }
 
-async function downloadAudio(url, outputPath) {
-    const response = await axios({
-        url,
-        method: 'GET',
-        responseType: 'stream',
-    });
-    const writer = fs.createWriteStream(outputPath);
-    response.data.pipe(writer);
-
-    return new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-    });
-}
-
-async function playAudioInVoiceChannel(voiceChannelId, audioUrl) {
-    // Download the audio file first
-    const outputPath = './temp_audio.mp3'; // Temporary path for the downloaded audio file
-    await downloadAudio(audioUrl, outputPath);
-
-    // Join the voice channel
-    const voiceChannel = bot.channels.get(voiceChannelId);
-    if (!voiceChannel || !voiceChannel.join) {
-        console.log('The channel is not a voice channel.');
-        return;
-    }
-
-    const voiceConnection = await voiceChannel.join();
-
-    // Play the audio
-    voiceConnection.play(fs.createReadStream(outputPath), {
-        type: 'ogg/opus',
-    });
-
-    voiceConnection.on('end', () => {
-        console.log('Finished playing!');
-        voiceConnection.disconnect();
-        fs.unlinkSync(outputPath); // Clean up the audio file
-    });
-
-    voiceConnection.on('error', (error) => {
-        console.error('Error:', error);
-        voiceConnection.disconnect();
+function playTTSInVoiceChannel(voiceChannelId, filePath) {
+    bot.joinVoiceChannel(voiceChannelId).then((voiceConnection) => {
+        voiceConnection.play(filePath, {format: "mp3"}); 
+        voiceConnection.on("end", () => {
+            voiceConnection.disconnect(); // Leave the channel after playing the speech
+            fs.unlink(filePath, (err) => { // Optionally delete the file after playing
+                if (err) console.error("Error deleting TTS file:", err);
+            });
+        });
+    }).catch((err) => {
+        console.error("Error joining voice channel:", err);
     });
 }
+
+
   
 bot.on("ready", () => {
     console.log("Ready!");
@@ -130,25 +98,8 @@ bot.on("ready", () => {
 });
 
 bot.on("messageCreate", async (msg) => {
-
     if(msg.content === "!ping") {
         bot.createMessage(msg.channel.id, "Pong!");
-    } else if (msg.content.startsWith("!speak ")) {
-        if (!msg.member.voiceState.channelID) {
-            return msg.channel.createMessage("You must be in a voice channel to use the !speak command.");
-        }
-
-        const textToSpeak = msg.content.slice(7); // Extract the text to be converted to speech
-        const voiceModel = "desired-voice-model-id"; // Specify the ElevenLabs voice model you want to use
-
-        try {
-            const audioUrl = await generateSpeechFromText(textToSpeak, voiceModel);
-            // Assuming you have a function to handle joining the voice channel and playing the audio
-            await playAudioInVoiceChannel(msg.member.voiceState.channelID, audioUrl);
-        } catch (error) {
-            console.error("Error with ElevenLabs TTS: ", error);
-            msg.channel.createMessage("An error occurred while trying to generate speech.");
-        }
     } else if (msg.content == "!language"){
         bot.createMessage(msg.channel.id, {
             content: "Choose your language!",
@@ -238,7 +189,26 @@ bot.on("messageCreate", async (msg) => {
         
     }
 
-    
+    if (msg.content.startsWith("!say ")) {
+        const text = msg.content.slice(5); // Remove "!say " to get the text
+        if (!msg.member.voiceState.channelID) {
+            bot.createMessage(msg.channel.id, "You need to be in a voice channel to use this command.");
+            return;
+        }
+        
+        try {
+            const voiceChannelId = msg.member.voiceState.channelID;
+            const languageCode = memberMap.has(msg.author.id) ? memberMap.get(msg.author.id).language : "en-US";
+            const voiceId = "Joanna"; // Example: Set this based on languageCode or user preference
+
+            const filePath = await doTTS(text, languageCode, voiceId);
+            // Play the generated speech file in the user's voice channel
+            playTTSInVoiceChannel(voiceChannelId, filePath);
+        } catch (error) {
+            console.error("Error generating speech:", error);
+            bot.createMessage(msg.channel.id, "There was an error generating the speech.");
+        }
+    }
 });
 
 bot.on("voiceChannelJoin", (member, newChannel) => {
@@ -286,8 +256,6 @@ bot.on("interactionCreate", (interaction) => {
             })
         }
     }
-
-    
 });
 
 bot.connect();
