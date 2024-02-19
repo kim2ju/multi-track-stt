@@ -74,7 +74,7 @@ bot.on("ready", () => {
 
                 const memberData = memberMap.get(userID);
                 console.log(memberData.language)
-                doSTT(`./outputs/${filename}.wav`, memberData.language, samplerate); //STT on wav file
+                doSTT(`./outputs/${filename}.wav`, memberData.language, samplerate, channelGame); //STT on wav file
                 //doSTT(`./outputs/${filename}-mono.pcm`, memberData.language, samplerate); //STT on pcm file
                 userVoiceDataMap.delete(userID);
                 fs.unlink(`./outputs/${filename}.pcm`, () => {});

@@ -22,7 +22,7 @@ async function* audioSource(filename) {
     }
 }
 
-const doSTT = async (filename, language, sample_rate) => {
+const doSTT = async (filename, language, sample_rate, channelGame) => {
     const startTime = process.hrtime();
     async function * audioStream() {
         for await(const chunk of audioSource(filename)) {
@@ -42,6 +42,7 @@ const doSTT = async (filename, language, sample_rate) => {
         MediaSampleRateHertz: sample_rate,
         MediaEncoding: 'pcm',
         AudioStream: audioStream(),
+        VocabularyName: channelGame + '_' + language
     });
 
     try {
