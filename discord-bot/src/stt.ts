@@ -48,6 +48,7 @@ const doSTT = async (filename, language, sample_rate, channelGame) => {
     try {
         const data = await client.send(command, {sessionTimeout: 2000});
         // console.log(filename)
+        let text = '';
         for await (const event of data.TranscriptResultStream) {
             if(event.TranscriptEvent) {
                 const results = event.TranscriptEvent.Transcript.Results;
@@ -55,13 +56,16 @@ const doSTT = async (filename, language, sample_rate, channelGame) => {
                     if (!result.IsPartial)
                         (result.Alternatives).map(alternative => {
                             console.log(alternative.Transcript)
+                            text = alternative.Transcript;
                         })
                 })
+                //text = results[results.length - 1].slice(-1).Transcript;
             }
         }
         const endTime = process.hrtime(startTime);
         console.log('Transcribe 실행 시간: %ds %dms', endTime[0], endTime[1] / 1000000);
         client.destroy();
+        return text;
     } catch(e) {
         console.log('ERROR: ', e);
         process.exit(1);

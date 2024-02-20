@@ -3,6 +3,7 @@ const fs = require("fs");
 const wavConverter = require("wav-converter");
 const path = require("path");
 const doSTT = require('./stt').default;
+const doTranslation = require('./tts').default;
 
 require('dotenv').config();
 
@@ -64,7 +65,34 @@ bot.on("ready", () => {
                 fs.writeFileSync(outputFilePath, monoBuffer);
 
                 const memberData = memberMap.get(userID);
-                doSTT(`./outputs/${filename}-mono.pcm`, memberData.language, samplerate,channelGame); //STT on mono-pcm file
+                doSTT(`./outputs/${filename}-mono.pcm`, memberData.language, samplerate,channelGame) //STT on mono-pcm file
+                .then((text) => {
+                    if (text !== "") {
+                        const translationPromises = ['tr', 'ko', 'en'].map(targetLanguage => {
+                            if (memberData.language !== targetLanguage) {
+                            return doTranslation(text, memberData.language, targetLanguage, channelGame);
+                            }
+                          });
+                          
+                        Promise.all(translationPromises)
+                        .then((results) => {
+                            results.forEach(result => {
+                                console.log(result.TargetLanguageCode, result.TranslatedText);
+                                // bot.getDMChannel(userID).then((channel) => {
+                                //     channel.createMessage(`${memberData.name} : ${result.TranslatedText}`);}
+                                // )
+                                memberMap.forEach((user) => {
+                                    if (user.language.split("-")[0] === result.TargetLanguageCode) {
+                                        bot.getDMChannel(user.id).then((channel) => {
+                                            channel.createMessage(`${memberData.name} : ${result.TranslatedText}`);}
+                                        )
+                                    }
+                                });
+                            });
+                        })
+
+                    }})
+
                 userVoiceDataMap.delete(userID);
                 fs.unlink(`./outputs/${filename}.pcm`, () => {});
                 // fs.unlink(`./outputs/    ${filename}-mono.pcm`, () => {});
