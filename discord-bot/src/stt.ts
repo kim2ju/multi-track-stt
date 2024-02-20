@@ -9,9 +9,9 @@ function wait(time) {
     })
 }
 
-async function* audioSource(filename) {
+async function* audioSource(filePath) {
     const chunkSize = 10 * 1000;
-    const fileBuf = fs.readFileSync(filename);
+    const fileBuf = fs.readFileSync(filePath);
     let index = 0;
     let i = 0;
     while(index < fileBuf.length) {
@@ -24,8 +24,9 @@ async function* audioSource(filename) {
 
 const doSTT = async (filename, language, sample_rate, channelGame) => {
     const startTime = process.hrtime();
+    const filePath = `./outputs/${filename}-mono.pcm`;
     async function * audioStream() {
-        for await(const chunk of audioSource(filename)) {
+        for await(const chunk of audioSource(filePath)) {
             yield {AudioEvent: {AudioChunk: chunk}}
         }
     }
@@ -56,7 +57,7 @@ const doSTT = async (filename, language, sample_rate, channelGame) => {
                     if (!result.IsPartial)
                         (result.Alternatives).map(alternative => {
                             console.log(alternative.Transcript)
-                            text = alternative.Transcript;
+                            text += alternative.Transcript;
                         })
                 })
                 //text = results[results.length - 1].slice(-1).Transcript;
@@ -65,11 +66,11 @@ const doSTT = async (filename, language, sample_rate, channelGame) => {
         const endTime = process.hrtime(startTime);
         console.log('Transcribe 실행 시간: %ds %dms', endTime[0], endTime[1] / 1000000);
         client.destroy();
-        fs.unlink(filename, () => {});
-        return text;
+        fs.unlink(filePath, () => {});
+        return {filename: filename, text: text};
     } catch(e) {
         console.log('ERROR: ', e);
-        fs.unlink(filename, () => {});
+        fs.unlink(filePath, () => {});
         process.exit(1);
         
     }

@@ -20,6 +20,7 @@ const SENTENCE_INTERVAL = 1500;
 const userVoiceDataMap = new Map();
 const memberMap = new Map();
 const channelGame = "LOL";
+const ttsQueue = [];
 
 function stereoToMono(stereoBuffer) {
     const numChannels = 2;
@@ -65,39 +66,51 @@ bot.on("ready", () => {
                 fs.writeFileSync(outputFilePath, monoBuffer);
 
                 const memberData = memberMap.get(userID);
-                doSTT(`./outputs/${filename}-mono.pcm`, memberData.language, samplerate,channelGame) //STT on mono-pcm file
-                .then((text) => {
-                    if (text !== "") {
-                        const translationPromises = ['tr', 'ko', 'en'].map(targetLanguage => {
-                            if (memberData.language !== targetLanguage) {
-                            return doTranslation(text, memberData.language, targetLanguage, channelGame);
-                            }
-                          });
-                          
-                        Promise.all(translationPromises)
-                        .then((results) => {
-                            results.forEach(result => {
-                                console.log(result.TargetLanguageCode, result.TranslatedText);
-                                // bot.getDMChannel(userID).then((channel) => {
-                                //     channel.createMessage(`${memberData.name} : ${result.TranslatedText}`);}
-                                // )
-                                memberMap.forEach((user) => {
-                                    if (user.language.split("-")[0] === result.TargetLanguageCode) {
-                                        bot.getDMChannel(user.id).then((channel) => {
-                                            channel.createMessage(`${memberData.name} : ${result.TranslatedText}`);}
-                                        )
-                                    }
-                                });
-                            });
-                        })
-
-                    }})
+                ttsQueue.push({filename, text: "", name: memberData.name, language: memberData.language.split("-")[0], finish: false});
+                doSTT(filename, memberData.language, samplerate, channelGame) //STT on mono-pcm file
+                .then(({filename, text}) => {
+                    const fileIndex = ttsQueue.findIndex((item) => item.filename === filename);
+                    ttsQueue[fileIndex].text = text;
+                    ttsQueue[fileIndex].finish = true;
+                })
 
                 userVoiceDataMap.delete(userID);
                 fs.unlink(`./outputs/${filename}.pcm`, () => {});
                 // fs.unlink(`./outputs/    ${filename}-mono.pcm`, () => {});
             }
         });
+
+        if (ttsQueue.length > 0 && ttsQueue[0].finish) {
+            const { filename, text, name, language, result } = ttsQueue.shift();
+            console.log(text, name, language);
+            if (text !== "") {
+                const translationPromises = ['tr', 'ko', 'en'].map(targetLanguage => {
+                    if (language !== targetLanguage) {
+                        return doTranslation(text, language, targetLanguage, channelGame);
+                    } else {
+                        return {TargetLanguageCode: targetLanguage, TranslatedText: text};
+                    }
+                });
+                  
+                Promise.all(translationPromises)
+                .then((results) => {
+                    results.forEach(result => {
+                        console.log(result.TargetLanguageCode, result.TranslatedText);
+                        // bot.getDMChannel(userID).then((channel) => {
+                        //     channel.createMessage(`${memberData.name} : ${result.TranslatedText}`);}
+                        // )
+                        memberMap.forEach((user) => {
+                            if (user.language.split("-")[0] === result.TargetLanguageCode) {
+                                bot.getDMChannel(user.id).then((channel) => {
+                                    channel.createMessage(`${name} : ${result.TranslatedText}`);}
+                                )
+                            }
+                        });
+                    });
+                })
+
+            }
+        }
     }, SENTENCE_INTERVAL);
 });
 
