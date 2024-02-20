@@ -65,12 +65,14 @@ const doSTT = async (filename, language, sample_rate, channelGame) => {
         const endTime = process.hrtime(startTime);
         console.log('Transcribe 실행 시간: %ds %dms', endTime[0], endTime[1] / 1000000);
         client.destroy();
+        fs.unlink(filename, () => {});
         return text;
     } catch(e) {
         console.log('ERROR: ', e);
+        fs.unlink(filename, () => {});
         process.exit(1);
+        
     }
-    fs.unlink(filename, () => {});
 }
 
 export default doSTT;
