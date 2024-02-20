@@ -23,6 +23,7 @@ async function* audioSource(filePath) {
 }
 
 const doSTT = async (filename, language, sample_rate, channelGame) => {
+    //console.log('doSTT')
     const startTime = process.hrtime();
     const filePath = `./outputs/${filename}-mono.pcm`;
     async function * audioStream() {

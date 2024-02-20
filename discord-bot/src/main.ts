@@ -1,9 +1,12 @@
+import { channel } from "diagnostics_channel";
+
 const Eris = require("eris");
 const fs = require("fs");
 const wavConverter = require("wav-converter");
 const path = require("path");
 const doSTT = require('./stt').default;
-const doTranslation = require('./tts').default;
+const doTranslation = require('./translate').default;
+const doTTS = require('./tts').default;
 
 require('dotenv').config();
 
@@ -12,6 +15,7 @@ const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
     getAllUsers: true,
     intents: 98303	
 });
+const { createAudioResource, createAudioPlayer, getVoiceConnection } = require('@discordjs/voice');
 
 const Constants = Eris.Constants;
 
@@ -91,11 +95,19 @@ bot.on("ready", () => {
                         return {TargetLanguageCode: targetLanguage, TranslatedText: text};
                     }
                 });
-                  
                 Promise.all(translationPromises)
                 .then((results) => {
                     results.forEach(result => {
                         console.log(result.TargetLanguageCode, result.TranslatedText);
+                        //save mp3 file for each language
+                        if (result.TargetLanguageCode === 'tr'){
+                            const filePath_tr = doTTS(result.TranslatedText, 'tr-TR', "Joanna"); 
+                        } else if (result.TargetLanguageCode === 'ko') {
+                            const filePath_ko = doTTS(result.TranslatedText, 'ko-KR', "Joanna"); 
+                        } else{
+                            const filePath_en = doTTS(result.TranslatedText, 'en-US', "Joanna"); 
+                        }
+                        //console.log('done STT-translate-TTS')
                         // bot.getDMChannel(userID).then((channel) => {
                         //     channel.createMessage(`${memberData.name} : ${result.TranslatedText}`);}
                         // )
@@ -103,7 +115,14 @@ bot.on("ready", () => {
                             if (user.language.split("-")[0] === result.TargetLanguageCode) {
                                 bot.getDMChannel(user.id).then((channel) => {
                                     channel.createMessage(`${name} : ${result.TranslatedText}`);}
+                                    
                                 )
+                                //play mp3file TODO
+                                // connection => {
+                                //     const dispatcher = connection.playFile('./tts_output/1708433815373-en-US.mp3');
+                                //     //dispatcher.on("end", end => {message.member.voiceChannel.leave()});
+                                // }
+
                             }
                         });
                     });
