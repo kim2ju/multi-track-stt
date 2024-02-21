@@ -17,6 +17,7 @@
   "dependencies": {
     "@aws-sdk/client-transcribe-streaming": "^3.504.0",
     "@aws-sdk/client-translate": "^3.515.0",
+    "@elastic/elasticsearch": "^8.12.1",
     "dotenv": "^16.3.2",
     "eris": "^0.17.2",
     "wav-converter": "^1.0.0"
