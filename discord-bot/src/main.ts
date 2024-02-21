@@ -17,10 +17,11 @@ const Constants = Eris.Constants;
 
 const SENTENCE_INTERVAL = 1500; 
 
-const userVoiceDataMap = new Map();
-const memberMap = new Map();
-const channelGame = "LOL";
-const ttsQueue = [];
+const channelMap = new Map();
+// const userVoiceDataMap = new Map();
+// const memberMap = new Map();
+// const channelGame = "LOL";
+// const ttsQueue = [];
 
 function stereoToMono(stereoBuffer) {
     const numChannels = 2;
@@ -49,68 +50,79 @@ function stereoToMono(stereoBuffer) {
 bot.on("ready", () => {
     console.log("Ready!");
     setInterval(() => {
-        userVoiceDataMap.forEach((userData, userID) => {
-            const currentTime = Date.now();
-            const elapsedTimeSinceLastSTT = currentTime - userData.startTime;
-            const samplerate = 48000
-            if (currentTime - userData.lastTime >= SENTENCE_INTERVAL || elapsedTimeSinceLastSTT >= 15000 ) {
-                const filename = userData.filename;
+        channelMap.forEach((channel) => {
+            const userVoiceDataMap = channel.userVoiceDataMap;
+            const memberMap = channel.memberMap;
+            const channelGame = channel.channelGame;
+            const ttsQueue = channel.ttsQueue;
+            console.log(userVoiceDataMap);
+            console.log(memberMap);
+            console.log(channelGame);
+            console.log(ttsQueue);
 
-                const inputFilePath = `./outputs/${filename}.pcm`;
-                const outputFilePath = `./outputs/${filename}-mono.pcm`;
+            userVoiceDataMap.forEach((userData, userID) => {
+                const currentTime = Date.now();
+                const elapsedTimeSinceLastSTT = currentTime - userData.startTime;
+                const samplerate = 48000
+                if (currentTime - userData.lastTime >= SENTENCE_INTERVAL || elapsedTimeSinceLastSTT >= 15000 ) {
+                    const filename = userData.filename;
 
-                const stereoBuffer = fs.readFileSync(inputFilePath);
+                    const inputFilePath = `./outputs/${filename}.pcm`;
+                    const outputFilePath = `./outputs/${filename}-mono.pcm`;
 
-                const monoBuffer = stereoToMono(stereoBuffer);
+                    const stereoBuffer = fs.readFileSync(inputFilePath);
 
-                fs.writeFileSync(outputFilePath, monoBuffer);
+                    const monoBuffer = stereoToMono(stereoBuffer);
 
-                const memberData = memberMap.get(userID);
-                ttsQueue.push({filename, text: "", name: memberData.name, language: memberData.language.split("-")[0], finish: false});
-                doSTT(filename, memberData.language, samplerate, channelGame) //STT on mono-pcm file
-                .then(({filename, text}) => {
-                    const fileIndex = ttsQueue.findIndex((item) => item.filename === filename);
-                    ttsQueue[fileIndex].text = text;
-                    ttsQueue[fileIndex].finish = true;
-                })
+                    fs.writeFileSync(outputFilePath, monoBuffer);
 
-                userVoiceDataMap.delete(userID);
-                fs.unlink(`./outputs/${filename}.pcm`, () => {});
-                // fs.unlink(`./outputs/    ${filename}-mono.pcm`, () => {});
-            }
-        });
+                    const memberData = memberMap.get(userID);
+                    ttsQueue.push({filename, text: "", name: memberData.name, language: memberData.language.split("-")[0], finish: false});
+                    doSTT(filename, memberData.language, samplerate, channelGame) //STT on mono-pcm file
+                    .then(({filename, text}) => {
+                        const fileIndex = ttsQueue.findIndex((item) => item.filename === filename);
+                        ttsQueue[fileIndex].text = text;
+                        ttsQueue[fileIndex].finish = true;
+                    })
 
-        if (ttsQueue.length > 0 && ttsQueue[0].finish) {
-            const { filename, text, name, language, result } = ttsQueue.shift();
-            console.log(text, name, language);
-            if (text !== "") {
-                const translationPromises = ['tr', 'ko', 'en'].map(targetLanguage => {
-                    if (language !== targetLanguage) {
-                        return doTranslation(text, language, targetLanguage, channelGame);
-                    } else {
-                        return {TargetLanguageCode: targetLanguage, TranslatedText: text};
-                    }
-                });
-                  
-                Promise.all(translationPromises)
-                .then((results) => {
-                    results.forEach(result => {
-                        console.log(result.TargetLanguageCode, result.TranslatedText);
-                        // bot.getDMChannel(userID).then((channel) => {
-                        //     channel.createMessage(`${memberData.name} : ${result.TranslatedText}`);}
-                        // )
-                        memberMap.forEach((user) => {
-                            if (user.language.split("-")[0] === result.TargetLanguageCode) {
-                                bot.getDMChannel(user.id).then((channel) => {
-                                    channel.createMessage(`${name} : ${result.TranslatedText}`);}
-                                )
-                            }
-                        });
+                    userVoiceDataMap.delete(userID);
+                    fs.unlink(`./outputs/${filename}.pcm`, () => {});
+                    // fs.unlink(`./outputs/    ${filename}-mono.pcm`, () => {});
+                }
+            });
+
+            if (ttsQueue.length > 0 && ttsQueue[0].finish) {
+                const { filename, text, name, language, result } = ttsQueue.shift();
+                console.log(text, name, language);
+                if (text !== "") {
+                    const translationPromises = ['tr', 'ko', 'en'].map(targetLanguage => {
+                        if (language !== targetLanguage) {
+                            return doTranslation(text, language, targetLanguage, channelGame);
+                        } else {
+                            return {TargetLanguageCode: targetLanguage, TranslatedText: text};
+                        }
                     });
-                })
+                    
+                    Promise.all(translationPromises)
+                    .then((results) => {
+                        results.forEach(result => {
+                            console.log(result.TargetLanguageCode, result.TranslatedText);
+                            // bot.getDMChannel(userID).then((channel) => {
+                            //     channel.createMessage(`${memberData.name} : ${result.TranslatedText}`);}
+                            // )
+                            memberMap.forEach((user) => {
+                                if (user.language.split("-")[0] === result.TargetLanguageCode) {
+                                    bot.getDMChannel(user.id).then((channel) => {
+                                        channel.createMessage(`${name} : ${result.TranslatedText}`);}
+                                    )
+                                }
+                            });
+                        });
+                    })
 
+                }
             }
-        }
+        })
     }, SENTENCE_INTERVAL);
 });
 
@@ -197,6 +209,15 @@ bot.on("messageCreate", (msg) => {
                 console.log(err);
             }).then((voiceConnection) => {
                 bot.createMessage(msg.channel.id, "hello");
+                channelMap.set(msg.member.voiceState.channelID, { 
+                    userVoiceDataMap: new Map(),
+                    memberMap: new Map(),
+                    channelGame: "LOL",
+                    ttsQueue: []
+                });
+                const channel = channelMap.get(msg.member.voiceState.channelID);
+                const userVoiceDataMap = channel.userVoiceDataMap;
+                const memberMap = channel.memberMap;
                 bot.getChannel(msg.member.voiceState.channelID).voiceMembers.forEach((member) => {
                     if (!memberMap.has(member.id) && !member.bot)
                         memberMap.set(member.id, {
@@ -229,11 +250,18 @@ bot.on("messageCreate", (msg) => {
             bot.createMessage(msg.channel.id, "You are not in a voice channel.");
             return;
         } else {
+            channelMap.delete(msg.member.voiceState.channelID);
             bot.leaveVoiceChannel(msg.member.voiceState.channelID)
             bot.createMessage(msg.channel.id, "bye");
         }
     } else if (msg.content == "!getLanguageSettings") {
         let languageSettings = "";
+        const channel = channelMap.get(msg.member.voiceState.channelID);
+        if (channel === undefined) {
+            bot.createMessage(msg.channel.id, "Bot is not in a voice channel.");
+            return;
+        }
+        const memberMap = channel.memberMap;
         memberMap.forEach((user) => {
             languageSettings += `${user.name} : ${user.language}\n`;
         });
@@ -244,11 +272,22 @@ bot.on("messageCreate", (msg) => {
             bot.createMessage(msg.channel.id, languageSettings);
         }
     } else if (msg.content == "!getGameSettings") {
+        const channel = channelMap.get(msg.member.voiceState.channelID);
+        if (channel === undefined) {
+            bot.createMessage(msg.channel.id, "Bot is not in a voice channel.");
+            return;
+        }
+        const channelGame = channel.channelGame;
         bot.createMessage(msg.channel.id, `The game is set to ${channelGame}.`);
     }
 });
 
 bot.on("voiceChannelJoin", (member, newChannel) => {
+    const channel = channelMap.get(member.voiceState.channelID);
+    if (channel === undefined) {
+        return null;
+    }
+    const memberMap = channel.memberMap;
      if (!memberMap.has(member.id) && !member.bot)
         memberMap.set(member.id, {
             id: member.id,
@@ -258,31 +297,27 @@ bot.on("voiceChannelJoin", (member, newChannel) => {
 });
 
 bot.on("voiceChannelLeave", (member, newChannel) => {
+    const channel = channelMap.get(member.voiceState.channelID);
+    if (channel === undefined) {
+        return null;
+    }
+    const memberMap = channel.memberMap;
     if (memberMap.has(member.id) && !member.bot)
        memberMap.delete(member.id);
 });
 
 bot.on("interactionCreate", (interaction) => {
+    const channel = channelMap.get(interaction.member.voiceState.channelID);
+    if (channel === undefined) {
+        return interaction.createMessage("Bot is not in a voice channel.");
+    }
+    const memberMap = channel.memberMap;
     if(interaction instanceof Eris.ComponentInteraction) { 
         if (["LOL", "overwatch", "AmongUs", "pubg"].includes(interaction.data.custom_id)) {
-            const channelGame = interaction.data.custom_id;
-            if (channelGame === "LOL") {
-                return interaction.createMessage({
-                    content: "League of Legends is set."
-                })
-            } else if (channelGame === "overwatch") {    
-                return interaction.createMessage({
-                    content: "Overwatch is set."
-                })
-            } else if (channelGame === "AmongUs") {
-                return interaction.createMessage({
-                    content: "Among Us is set."
-                })
-            } else if (channelGame === "pubg") {
-                return interaction.createMessage({
-                    content: "Battlegrounds is set."
-                })
-            }
+            channel.channelGame = interaction.data.custom_id;
+            return interaction.createMessage({
+                content: `${interaction.data.custom_id} is set.`
+            })
         } else {
             const userId = interaction.member.user.id;
             const userLanguage = interaction.data.custom_id;
