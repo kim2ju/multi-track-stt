@@ -4,9 +4,18 @@ const wavConverter = require("wav-converter");
 const path = require("path");
 const doSTT = require('./stt').default;
 const doTranslation = require('./tts').default;
-
+const { Client } = require('@elastic/elasticsearch')
 require('dotenv').config();
 
+const es = new Client({
+  node: process.env.ELASTIC_ENDPOINT, 
+  auth: {
+    apiKey: { 
+      id: process.env.ELASTIC_API_ID,
+      api_key: process.env.ELASTIC_API_KEY,
+    }
+  }
+})
 
 const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
     getAllUsers: true,
@@ -107,6 +116,18 @@ bot.on("ready", () => {
                             }
                         });
                     });
+
+                    const res = es.index({
+                        index: 'discord_game_stt_translation',
+                        body: {
+                            "english_sentence": results[2].TranslatedText,
+                            "category": channelGame,
+                            "korean_sentence": results[1].TranslatedText,
+                            "turkish_sentence": results[0].TranslatedText,
+                            "source_language": language,
+                        }
+                    })
+                    console.log(res)
                 })
 
             }
