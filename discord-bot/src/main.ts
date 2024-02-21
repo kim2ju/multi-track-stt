@@ -112,21 +112,12 @@ bot.on("ready", () => {
                             // )
                             memberMap.forEach((user) => {
                                 if (user.language.split("-")[0] === result.TargetLanguageCode) {
-                                    // console.log(`userID: ${user.id}`)
-                                    // console.log(result)
-                                    // console.log(user)
-                                    // if(name === user.name){
-                                    //     console.log(name)
-                                    // }
 
                                     if (name !== user.name) {
                                         bot.getDMChannel(user.id).then((channel) => {
                                             channel.createMessage(`${name} : ${result.TranslatedText}`);}
                                         )
                                     }
-                                    // bot.getDMChannel(user.id).then((channel) => {
-                                    //     channel.createMessage(`${name} : ${result.TranslatedText}`);}
-                                    // )
                                 }
                             });
                         });
