@@ -107,9 +107,6 @@ bot.on("ready", () => {
                     .then((results) => {
                         results.forEach(result => {
                             console.log(result.TargetLanguageCode, result.TranslatedText);
-                            // bot.getDMChannel(userID).then((channel) => {
-                            //     channel.createMessage(`${memberData.name} : ${result.TranslatedText}`);}
-                            // )
                             memberMap.forEach((user) => {
                                 if (user.language.split("-")[0] === result.TargetLanguageCode) {
 
@@ -118,6 +115,7 @@ bot.on("ready", () => {
                                             channel.createMessage(`${name} : ${result.TranslatedText}`);}
                                         )
                                     }
+
                                 }
                             });
                         });
