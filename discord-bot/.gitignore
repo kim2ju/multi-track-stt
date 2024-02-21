@@ -3,3 +3,4 @@
 /outputs/*
 .env
 *.pcm
+/tts_output/*
