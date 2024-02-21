@@ -3,7 +3,7 @@ const fs = require("fs");
 const wavConverter = require("wav-converter");
 const path = require("path");
 const doSTT = require('./stt').default;
-const doTranslation = require('./tts').default;
+const doTranslation = require('./translate').default;
 
 require('dotenv').config();
 
@@ -55,10 +55,10 @@ bot.on("ready", () => {
             const memberMap = channel.memberMap;
             const channelGame = channel.channelGame;
             const ttsQueue = channel.ttsQueue;
-            console.log(userVoiceDataMap);
-            console.log(memberMap);
-            console.log(channelGame);
-            console.log(ttsQueue);
+            // console.log(userVoiceDataMap);
+            // console.log(memberMap);
+            // console.log(channelGame);
+            // console.log(ttsQueue);
 
             userVoiceDataMap.forEach((userData, userID) => {
                 const currentTime = Date.now();
@@ -95,7 +95,7 @@ bot.on("ready", () => {
                 const { filename, text, name, language, result } = ttsQueue.shift();
                 console.log(text, name, language);
                 if (text !== "") {
-                    const translationPromises = ['tr', 'ko', 'en'].map(targetLanguage => {
+                    const translationPromises = ['de', 'ko', 'en'].map(targetLanguage => {
                         if (language !== targetLanguage) {
                             return doTranslation(text, language, targetLanguage, channelGame);
                         } else {
@@ -112,9 +112,21 @@ bot.on("ready", () => {
                             // )
                             memberMap.forEach((user) => {
                                 if (user.language.split("-")[0] === result.TargetLanguageCode) {
-                                    bot.getDMChannel(user.id).then((channel) => {
-                                        channel.createMessage(`${name} : ${result.TranslatedText}`);}
-                                    )
+                                    // console.log(`userID: ${user.id}`)
+                                    // console.log(result)
+                                    // console.log(user)
+                                    // if(name === user.name){
+                                    //     console.log(name)
+                                    // }
+                                    
+                                    if (name !== user.name) {
+                                        bot.getDMChannel(user.id).then((channel) => {
+                                            channel.createMessage(`${name} : ${result.TranslatedText}`);}
+                                        )
+                                    }
+                                    // bot.getDMChannel(user.id).then((channel) => {
+                                    //     channel.createMessage(`${name} : ${result.TranslatedText}`);}
+                                    // )
                                 }
                             });
                         });
@@ -153,8 +165,8 @@ bot.on("messageCreate", (msg) => {
                         {
                             type: Constants.ComponentTypes.BUTTON,
                             style: Constants.ButtonStyles.PRIMARY,
-                            custom_id: "tr-TR",
-                            label: "Türkçe",
+                            custom_id: "de-DE",
+                            label: "Deutsche",
                             disabled: false
                         }
                     ]
@@ -340,9 +352,9 @@ bot.on("interactionCreate", (interaction) => {
                 return interaction.createMessage({
                     content: `<@${userId}> English is set.`    
                 })
-            } else if (userLanguage === "tr-TR") {
+            } else if (userLanguage === "de-DE") {
                 return interaction.createMessage({
-                    content: `<@${userId}> Türkçe olarak ayarlandı.`
+                    content: `<@${userId}> Auf Deutsch eingestellt.`
                 })
             }
         }
