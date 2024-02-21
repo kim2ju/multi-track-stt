@@ -118,7 +118,7 @@ bot.on("ready", () => {
                                     // if(name === user.name){
                                     //     console.log(name)
                                     // }
-                                    
+
                                     if (name !== user.name) {
                                         bot.getDMChannel(user.id).then((channel) => {
                                             channel.createMessage(`${name} : ${result.TranslatedText}`);}
@@ -166,7 +166,7 @@ bot.on("messageCreate", (msg) => {
                             type: Constants.ComponentTypes.BUTTON,
                             style: Constants.ButtonStyles.PRIMARY,
                             custom_id: "de-DE",
-                            label: "Deutsche",
+                            label: "Deutsch",
                             disabled: false
                         }
                     ]
