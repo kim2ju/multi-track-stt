@@ -4,7 +4,7 @@ const wavConverter = require("wav-converter");
 const path = require("path");
 const doSTT = require('./stt').default;
 const doTranslation = require('./translate').default;
-
+const { Client } = require('@elastic/elasticsearch')
 require('dotenv').config();
 
 
@@ -12,6 +12,15 @@ const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
     getAllUsers: true,
     intents: 98303	
 });
+const es = new Client({
+    cloud: {
+        id: process.env.ELASTIC_CLOUD_ID
+      },
+      auth: {
+        username: process.env.ELASTIC_USERNAME,
+        password: process.env.ELASTIC_PASSWORD
+      }
+})
 
 const Constants = Eris.Constants;
 
@@ -107,29 +116,33 @@ bot.on("ready", () => {
                     .then((results) => {
                         results.forEach(result => {
                             console.log(result.TargetLanguageCode, result.TranslatedText);
-                            // bot.getDMChannel(userID).then((channel) => {
-                            //     channel.createMessage(`${memberData.name} : ${result.TranslatedText}`);}
-                            // )
                             memberMap.forEach((user) => {
                                 if (user.language.split("-")[0] === result.TargetLanguageCode) {
-                                    // console.log(`userID: ${user.id}`)
-                                    // console.log(result)
-                                    // console.log(user)
-                                    // if(name === user.name){
-                                    //     console.log(name)
-                                    // }
 
                                     if (name !== user.name) {
                                         bot.getDMChannel(user.id).then((channel) => {
                                             channel.createMessage(`${name} : ${result.TranslatedText}`);}
                                         )
                                     }
-                                    // bot.getDMChannel(user.id).then((channel) => {
-                                    //     channel.createMessage(`${name} : ${result.TranslatedText}`);}
-                                    // )
+
                                 }
                             });
                         });
+
+                        es.index({
+                            index: 'discord_game_stt_translation',
+                            body: {
+                                "english_sentence": results[2].TranslatedText,
+                                "category": channelGame,
+                                "korean_sentence": results[1].TranslatedText,
+                                "turkish_sentence": results[0].TranslatedText,
+                                "source_language": language,
+                            }
+                        }).then((res) => {
+                            console.log(res);
+                        }).catch((err) => {
+                            console.log(err);
+                        })
                     })
 
                 }

@@ -1,7 +1,7 @@
 const { TranslateClient, TranslateTextCommand } = require("@aws-sdk/client-translate");
 require('dotenv').config();
 
-const doTranslation = (text, sourceLanguage, targetLanguage) => {
+const doTranslation = (text, sourceLanguage, targetLanguage, channelGame) => {
     const client = new TranslateClient({
         region: 'ap-northeast-2',
         credentials: {
@@ -13,7 +13,8 @@ const doTranslation = (text, sourceLanguage, targetLanguage) => {
     const command = new TranslateTextCommand({
         SourceLanguageCode: sourceLanguage,
         TargetLanguageCode: targetLanguage,
-        Text: text
+        Text: text,
+        TerminologyNames: [ channelGame + '_term' ]
     });
 
     return new Promise((resolve, reject) => {
