@@ -2,9 +2,9 @@ const Eris = require("eris");
 const fs = require("fs");
 const wavConverter = require("wav-converter");
 const path = require("path");
+const ChannelData = require('./ChannelData');
 const doSTT = require('./stt').default;
 const doTranslation = require('./translate').default;
-const { Client } = require('@elastic/elasticsearch')
 require('dotenv').config();
 
 
@@ -12,25 +12,83 @@ const bot = new Eris(process.env.DISCORD_BOT_TOKEN, {
     getAllUsers: true,
     intents: 98303	
 });
-const es = new Client({
-    cloud: {
-        id: process.env.ELASTIC_CLOUD_ID
-      },
-      auth: {
-        username: process.env.ELASTIC_USERNAME,
-        password: process.env.ELASTIC_PASSWORD
-      }
-})
 
 const Constants = Eris.Constants;
 
 const SENTENCE_INTERVAL = 1500; 
 
-const channelMap = new Map();
-// const userVoiceDataMap = new Map();
-// const memberMap = new Map();
-// const channelGame = "LOL";
-// const ttsQueue = [];
+const channelDataMap = new Map();
+
+function getChannelData(channelID) {
+    let channelData = channelDataMap.get(channelID);
+    if (!channelData) {
+        channelData = new ChannelData(channelID);
+        channelDataMap.set(channelID, channelData);
+    }
+    return channelData;
+}
+
+async function processChannelData(channelData) {
+    const { userVoiceDataMap, memberMap, channelGame, ttsQueue } = channelData;
+    const currentTime = Date.now();
+    const samplerate = 48000;
+
+    for (const [userID, userData] of userVoiceDataMap) {
+        const elapsedTimeSinceLastSTT = currentTime - userData.startTime;
+
+        if (currentTime - userData.lastTime >= SENTENCE_INTERVAL || elapsedTimeSinceLastSTT >= 15000) {
+            const { filename } = userData;
+            const inputFilePath = `./outputs/${filename}.pcm`;
+            const outputFilePath = `./outputs/${filename}-mono.pcm`;
+
+            const stereoBuffer = fs.readFileSync(inputFilePath);
+            const monoBuffer = stereoToMono(stereoBuffer);
+
+            fs.writeFileSync(outputFilePath, monoBuffer);
+
+            const memberData = memberMap.get(userID);
+            ttsQueue.push({ filename, text: "", name: memberData.name, language: memberData.language.split("-")[0], finish: false });
+
+            doSTT(filename, memberData.language, samplerate, channelGame)
+                .then(({ filename, text }) => {
+                    const fileIndex = ttsQueue.findIndex(item => item.filename === filename);
+                    ttsQueue[fileIndex].text = text;
+                    ttsQueue[fileIndex].finish = true;
+                })
+                .catch(error => console.error(error));
+
+            userVoiceDataMap.delete(userID);
+            fs.unlink(inputFilePath, () => {});
+        }
+    }
+
+    if (ttsQueue.length > 0 && ttsQueue[0].finish) {
+        const { filename, text, name, language } = ttsQueue.shift();
+        
+        if (text !== "") {
+            const translationPromises = ['de', 'ko', 'en'].map(targetLanguage => {
+                return (language !== targetLanguage) ? doTranslation(text, language, targetLanguage, channelGame) : { TargetLanguageCode: targetLanguage, TranslatedText: text };
+            });
+
+            try {
+                const results = await Promise.all(translationPromises);
+                results.forEach(result => {
+                    console.log(result.TargetLanguageCode, result.TranslatedText);
+                    memberMap.forEach(user => {
+                        if (user.language.split("-")[0] === result.TargetLanguageCode && name !== user.name) {
+                            bot.getDMChannel(user.id).then(channel => {
+                                channel.createMessage(`${name} : ${result.TranslatedText}`);
+                            });
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error(error);
+            }
+        }
+    }
+}
+
 
 function stereoToMono(stereoBuffer) {
     const numChannels = 2;
@@ -59,95 +117,9 @@ function stereoToMono(stereoBuffer) {
 bot.on("ready", () => {
     console.log("Ready!");
     setInterval(() => {
-        channelMap.forEach((channel) => {
-            const userVoiceDataMap = channel.userVoiceDataMap;
-            const memberMap = channel.memberMap;
-            const channelGame = channel.channelGame;
-            const ttsQueue = channel.ttsQueue;
-            // console.log(userVoiceDataMap);
-            // console.log(memberMap);
-            // console.log(channelGame);
-            // console.log(ttsQueue);
-
-            userVoiceDataMap.forEach((userData, userID) => {
-                const currentTime = Date.now();
-                const elapsedTimeSinceLastSTT = currentTime - userData.startTime;
-                const samplerate = 48000
-                if (currentTime - userData.lastTime >= SENTENCE_INTERVAL || elapsedTimeSinceLastSTT >= 15000 ) {
-                    const filename = userData.filename;
-
-                    const inputFilePath = `./outputs/${filename}.pcm`;
-                    const outputFilePath = `./outputs/${filename}-mono.pcm`;
-
-                    const stereoBuffer = fs.readFileSync(inputFilePath);
-
-                    const monoBuffer = stereoToMono(stereoBuffer);
-
-                    fs.writeFileSync(outputFilePath, monoBuffer);
-
-                    const memberData = memberMap.get(userID);
-                    ttsQueue.push({filename, text: "", name: memberData.name, language: memberData.language.split("-")[0], finish: false});
-                    doSTT(filename, memberData.language, samplerate, channelGame) //STT on mono-pcm file
-                    .then(({filename, text}) => {
-                        const fileIndex = ttsQueue.findIndex((item) => item.filename === filename);
-                        ttsQueue[fileIndex].text = text;
-                        ttsQueue[fileIndex].finish = true;
-                    })
-
-                    userVoiceDataMap.delete(userID);
-                    fs.unlink(`./outputs/${filename}.pcm`, () => {});
-                    // fs.unlink(`./outputs/    ${filename}-mono.pcm`, () => {});
-                }
-            });
-
-            if (ttsQueue.length > 0 && ttsQueue[0].finish) {
-                const { filename, text, name, language, result } = ttsQueue.shift();
-                console.log(text, name, language);
-                if (text !== "") {
-                    const translationPromises = ['de', 'ko', 'en'].map(targetLanguage => {
-                        if (language !== targetLanguage) {
-                            return doTranslation(text, language, targetLanguage, channelGame);
-                        } else {
-                            return {TargetLanguageCode: targetLanguage, TranslatedText: text};
-                        }
-                    });
-                    
-                    Promise.all(translationPromises)
-                    .then((results) => {
-                        results.forEach(result => {
-                            console.log(result.TargetLanguageCode, result.TranslatedText);
-                            memberMap.forEach((user) => {
-                                if (user.language.split("-")[0] === result.TargetLanguageCode) {
-
-                                    if (name !== user.name) {
-                                        bot.getDMChannel(user.id).then((channel) => {
-                                            channel.createMessage(`${name} : ${result.TranslatedText}`);}
-                                        )
-                                    }
-
-                                }
-                            });
-                        });
-
-                        es.index({
-                            index: 'discord_game_stt_translation',
-                            body: {
-                                "english_sentence": results[2].TranslatedText,
-                                "category": channelGame,
-                                "korean_sentence": results[1].TranslatedText,
-                                "turkish_sentence": results[0].TranslatedText,
-                                "source_language": language,
-                            }
-                        }).then((res) => {
-                            console.log(res);
-                        }).catch((err) => {
-                            console.log(err);
-                        })
-                    })
-
-                }
-            }
-        })
+        channelDataMap.forEach(channelData => {
+            processChannelData(channelData);
+        });
     }, SENTENCE_INTERVAL);
 });
 
@@ -234,23 +206,18 @@ bot.on("messageCreate", (msg) => {
                 console.log(err);
             }).then((voiceConnection) => {
                 bot.createMessage(msg.channel.id, "hello");
-                channelMap.set(msg.member.voiceState.channelID, { 
-                    userVoiceDataMap: new Map(),
-                    memberMap: new Map(),
-                    channelGame: "LOL",
-                    ttsQueue: []
-                });
-                const channel = channelMap.get(msg.member.voiceState.channelID);
+
+                const channelData = new ChannelData(msg.member.voiceState.channelID);
+                channelDataMap.set(msg.member.voiceState.channelID, channelData);
+
+                const channel = channelDataMap.get(msg.member.voiceState.channelID);
                 const userVoiceDataMap = channel.userVoiceDataMap;
-                const memberMap = channel.memberMap;
+
                 bot.getChannel(msg.member.voiceState.channelID).voiceMembers.forEach((member) => {
-                    if (!memberMap.has(member.id) && !member.bot)
-                        memberMap.set(member.id, {
-                        id: member.id,
-                        name: member.username,
-                        language: "en-US"
-                    });
+                    if (!member.bot)
+                        channelData.addMember(member.id, member.username);
                 })
+
                 const voiceReceiver = voiceConnection.receive("pcm")
                 voiceReceiver.on("data", (voiceData, userID, timestamp, sequence) => {
                     if (userID) {
@@ -275,13 +242,13 @@ bot.on("messageCreate", (msg) => {
             bot.createMessage(msg.channel.id, "You are not in a voice channel.");
             return;
         } else {
-            channelMap.delete(msg.member.voiceState.channelID);
+            channelDataMap.delete(msg.member.voiceState.channelID);
             bot.leaveVoiceChannel(msg.member.voiceState.channelID)
             bot.createMessage(msg.channel.id, "bye");
         }
     } else if (msg.content == "!getLanguageSettings") {
         let languageSettings = "";
-        const channel = channelMap.get(msg.member.voiceState.channelID);
+        const channel = channelDataMap.get(msg.member.voiceState.channelID);
         if (channel === undefined) {
             bot.createMessage(msg.channel.id, "Bot is not in a voice channel.");
             return;
@@ -297,7 +264,7 @@ bot.on("messageCreate", (msg) => {
             bot.createMessage(msg.channel.id, languageSettings);
         }
     } else if (msg.content == "!getGameSettings") {
-        const channel = channelMap.get(msg.member.voiceState.channelID);
+        const channel = channelDataMap.get(msg.member.voiceState.channelID);
         if (channel === undefined) {
             bot.createMessage(msg.channel.id, "Bot is not in a voice channel.");
             return;
@@ -308,31 +275,27 @@ bot.on("messageCreate", (msg) => {
 });
 
 bot.on("voiceChannelJoin", (member, newChannel) => {
-    const channel = channelMap.get(member.voiceState.channelID);
+    const channel = channelDataMap.get(member.voiceState.channelID);
     if (channel === undefined) {
         return null;
     }
-    const memberMap = channel.memberMap;
-     if (!memberMap.has(member.id) && !member.bot)
-        memberMap.set(member.id, {
-            id: member.id,
-            name: member.username,
-            language: "en-US" //default language is English
-        });
+
+    if (!member.bot)
+        channel.addMember(member.id, member.username);
 });
 
 bot.on("voiceChannelLeave", (member, newChannel) => {
-    const channel = channelMap.get(member.voiceState.channelID);
+    const channel = channelDataMap.get(member.voiceState.channelID);
     if (channel === undefined) {
         return null;
     }
-    const memberMap = channel.memberMap;
-    if (memberMap.has(member.id) && !member.bot)
-       memberMap.delete(member.id);
+
+    if (!member.bot)
+        channel.removeMember(member.id);
 });
 
 bot.on("interactionCreate", (interaction) => {
-    const channel = channelMap.get(interaction.member.voiceState.channelID);
+    const channel = channelDataMap.get(interaction.member.voiceState.channelID);
     if (channel === undefined) {
         return interaction.createMessage("Bot is not in a voice channel.");
     }
